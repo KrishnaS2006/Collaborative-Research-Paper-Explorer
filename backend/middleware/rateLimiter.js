@@ -98,5 +98,19 @@ export const createRateLimiter = (options = {}) => {
   return limiterMiddleware;
 };
 
-// Default export configured for login endpoint
+// Rate limiter instance configured for login endpoint
 export const loginRateLimiter = createRateLimiter();
+
+// Rate limiter instance configured for forgot-password requests
+export const forgotPasswordRateLimiter = createRateLimiter({
+  windowMs: Number(process.env.FORGOT_PASSWORD_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.FORGOT_PASSWORD_RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  message: 'Too many password reset requests. Please try again later.'
+});
+
+// Rate limiter instance configured for reset-password attempts
+export const resetPasswordRateLimiter = createRateLimiter({
+  windowMs: Number(process.env.RESET_PASSWORD_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RESET_PASSWORD_RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  message: 'Too many password reset attempts. Please try again later.'
+});

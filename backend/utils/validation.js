@@ -159,3 +159,61 @@ export const validateLoginPayload = (payload) => {
     }
   };
 };
+
+/**
+ * Validates forgot-password payload.
+ * @param {object} payload
+ * @returns {{ valid: boolean, error?: string, sanitized?: object }}
+ */
+export const validateForgotPasswordPayload = (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { valid: false, error: 'Invalid request body.' };
+  }
+
+  const { email } = payload;
+  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+    return { valid: false, error: 'Email is required.' };
+  }
+
+  const emailResult = validateEmail(email);
+  if (!emailResult.valid) {
+    return emailResult;
+  }
+
+  return {
+    valid: true,
+    sanitized: {
+      email: email.trim().toLowerCase()
+    }
+  };
+};
+
+/**
+ * Validates reset-password payload.
+ * @param {object} payload
+ * @returns {{ valid: boolean, error?: string, sanitized?: object }}
+ */
+export const validateResetPasswordPayload = (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { valid: false, error: 'Invalid request body.' };
+  }
+
+  const { token, password } = payload;
+
+  if (!token || typeof token !== 'string' || token.trim().length === 0) {
+    return { valid: false, error: 'Reset token is required.' };
+  }
+
+  const passwordResult = validatePassword(password);
+  if (!passwordResult.valid) {
+    return passwordResult;
+  }
+
+  return {
+    valid: true,
+    sanitized: {
+      token: token.trim(),
+      password // Intentionally NOT trimmed or modified
+    }
+  };
+};
