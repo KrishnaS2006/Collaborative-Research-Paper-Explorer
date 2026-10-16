@@ -1,0 +1,223 @@
+
+// backend/src/utils/validation.js
+
+export const validateEmail = (email) => {
+  if (!email || typeof email !== "string") {
+    return { valid: false, error: "Email is required." };
+  }
+
+  const trimmed = email.trim();
+
+  if (!trimmed) {
+    return { valid: false, error: "Email cannot be empty." };
+  }
+
+  if (trimmed.length > 255) {
+    return {
+      valid: false,
+      error: "Email cannot exceed 255 characters.",
+    };
+  }
+
+  const emailRegex =
+    /^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/;
+
+  if (!emailRegex.test(trimmed)) {
+    return {
+      valid: false,
+      error: "Please enter a valid email address.",
+    };
+  }
+
+  return { valid: true };
+};
+
+export const validatePassword = (password) => {
+  if (typeof password !== "string" || password.length === 0) {
+    return { valid: false, error: "Password is required." };
+  }
+
+  if (password.length < 8) {
+    return {
+      valid: false,
+      error: "Password must be at least 8 characters long.",
+    };
+  }
+
+  if (password.length > 128) {
+    return {
+      valid: false,
+      error: "Password cannot exceed 128 characters.",
+    };
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return {
+      valid: false,
+      error: "Password must contain at least one uppercase letter.",
+    };
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return {
+      valid: false,
+      error: "Password must contain at least one lowercase letter.",
+    };
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return {
+      valid: false,
+      error: "Password must contain at least one number.",
+    };
+  }
+
+  if (!/[^A-Za-z0-9\s]/.test(password)) {
+    return {
+      valid: false,
+      error: "Password must contain at least one special character.",
+    };
+  }
+
+  return { valid: true };
+};
+
+export const validateRegisterPayload = (payload) => {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return { valid: false, error: "Invalid request body." };
+  }
+
+  const { full_name, email, password, role } = payload;
+
+  if (
+    typeof full_name !== "string" ||
+    !full_name.trim()
+  ) {
+    return { valid: false, error: "Full name is required." };
+  }
+
+  if (full_name.trim().length > 150) {
+    return {
+      valid: false,
+      error: "Full name cannot exceed 150 characters.",
+    };
+  }
+
+  const emailResult = validateEmail(email);
+  if (!emailResult.valid) return emailResult;
+
+  const passwordResult = validatePassword(password);
+  if (!passwordResult.valid) return passwordResult;
+
+  const userRole = role ?? "STUDENT";
+  const allowedRoles = ["STUDENT", "RESEARCHER"];
+
+  if (
+    typeof userRole !== "string" ||
+    !allowedRoles.includes(userRole)
+  ) {
+    return {
+      valid: false,
+      error:
+        "Invalid role. Only STUDENT or RESEARCHER can be selected during registration.",
+    };
+  }
+
+  return {
+    valid: true,
+    sanitized: {
+      full_name: full_name.trim(),
+      email: email.trim().toLowerCase(),
+      password, // Never trim or alter passwords.
+      role: userRole,
+    },
+  };
+};
+
+export const validateLoginPayload = (payload) => {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return { valid: false, error: "Invalid request body." };
+  }
+
+  const { email, password } = payload;
+
+  if (typeof email !== "string" || !email.trim()) {
+    return { valid: false, error: "Email is required." };
+  }
+
+  if (typeof password !== "string" || !password) {
+    return { valid: false, error: "Password is required." };
+  }
+
+  const emailResult = validateEmail(email);
+  if (!emailResult.valid) return emailResult;
+
+  return {
+    valid: true,
+    sanitized: {
+      email: email.trim().toLowerCase(),
+      password, // Never trim or alter passwords.
+    },
+  };
+};
+
+export const validateForgotPasswordPayload = (payload) => {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return { valid: false, error: "Invalid request body." };
+  }
+
+  const { email } = payload;
+
+  if (typeof email !== "string" || !email.trim()) {
+    return { valid: false, error: "Email is required." };
+  }
+
+  const emailResult = validateEmail(email);
+  if (!emailResult.valid) return emailResult;
+
+  return {
+    valid: true,
+    sanitized: {
+      email: email.trim().toLowerCase(),
+    },
+  };
+};
+
+export const validateResetPasswordPayload = (payload) => {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return { valid: false, error: "Invalid request body." };
+  }
+
+  const { token, password } = payload;
+
+  if (typeof token !== "string" || !token.trim()) {
+    return { valid: false, error: "Reset token is required." };
+  }
+
+  const passwordResult = validatePassword(password);
+  if (!passwordResult.valid) return passwordResult;
+
+  return {
+    valid: true,
+    sanitized: {
+      token: token.trim(),
+      password, // Never trim or alter passwords.
+    },
+  };
+};
