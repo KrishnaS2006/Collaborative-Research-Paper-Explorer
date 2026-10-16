@@ -6,6 +6,7 @@ export default function Register() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('STUDENT'); // default
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,23 +14,36 @@ export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
 
+  // Password policy criteria
+  const isLengthValid = password.length >= 8;
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9\s]/.test(password);
+  const isPasswordStrong = isLengthValid && hasUpper && hasLower && hasNumber && hasSpecial;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!fullName || !email || !password || !role) {
+    if (!fullName.trim() || !email.trim() || !password || !confirmPassword || !role) {
       setError('Please fill in all fields.');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    if (!isPasswordStrong) {
+      setError('Password must be at least 8 characters long and contain uppercase, lowercase, a number, and a special character.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
     setLoading(true);
     try {
-      await register(fullName, email, password, role);
+      await register(fullName.trim(), email.trim(), password, role);
       alert(`Registration successful as ${role}! Please sign in.`);
       navigate('/login');
     } catch (err) {
@@ -57,7 +71,7 @@ export default function Register() {
 
         <form onSubmit={handleSubmit}>
           {/* Full Name */}
-          <div className="mb-5">
+          <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
               Full Name
             </label>
@@ -72,7 +86,7 @@ export default function Register() {
           </div>
 
           {/* Email */}
-          <div className="mb-5">
+          <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
               Email
             </label>
@@ -87,7 +101,7 @@ export default function Register() {
           </div>
 
           {/* Password */}
-          <div className="mb-5">
+          <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
               Password
             </label>
@@ -99,6 +113,42 @@ export default function Register() {
               required
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
             />
+          </div>
+
+          {/* Confirm Password */}
+          <div className="mb-3">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Confirm Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+            />
+          </div>
+
+          {/* Password Policy Guidelines */}
+          <div className="mb-5 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+            <p className="font-semibold text-slate-700 mb-1">Password requirements:</p>
+            <div className={`flex items-center gap-1.5 ${isLengthValid ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+              <span>{isLengthValid ? '✓' : '•'}</span>
+              <span>At least 8 characters long</span>
+            </div>
+            <div className={`flex items-center gap-1.5 ${hasUpper && hasLower ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+              <span>{hasUpper && hasLower ? '✓' : '•'}</span>
+              <span>Both uppercase (A-Z) and lowercase (a-z) letters</span>
+            </div>
+            <div className={`flex items-center gap-1.5 ${hasNumber ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+              <span>{hasNumber ? '✓' : '•'}</span>
+              <span>At least one number (0-9)</span>
+            </div>
+            <div className={`flex items-center gap-1.5 ${hasSpecial ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+              <span>{hasSpecial ? '✓' : '•'}</span>
+              <span>At least one special character (!@#$%^&*)</span>
+            </div>
           </div>
 
           {/* Role Selection */}
