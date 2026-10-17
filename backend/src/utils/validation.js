@@ -91,7 +91,14 @@ export const validateRegisterPayload = (payload) => {
     return { valid: false, error: "Invalid request body." };
   }
 
-  const { full_name, email, password, role } = payload;
+  const {
+    full_name,
+    email,
+    password,
+    role,
+    affiliation,
+    research_interests,
+  } = payload;
 
   if (
     typeof full_name !== "string" ||
@@ -127,6 +134,54 @@ export const validateRegisterPayload = (payload) => {
     };
   }
 
+  if (affiliation !== undefined) {
+    if (typeof affiliation !== "string" || !affiliation.trim()) {
+      return { valid: false, error: "Affiliation is required." };
+    }
+    if (affiliation.trim().length > 255) {
+      return {
+        valid: false,
+        error: "Affiliation cannot exceed 255 characters.",
+      };
+    }
+  }
+
+  let normalizedInterests = [];
+  if (research_interests !== undefined) {
+    if (!Array.isArray(research_interests)) {
+      return {
+        valid: false,
+        error: "Research interests must be a list.",
+      };
+    }
+
+    if (
+      research_interests.some(
+        (interest) => typeof interest !== "string" || !interest.trim()
+      )
+    ) {
+      return {
+        valid: false,
+        error: "Each research interest must be a non-empty string.",
+      };
+    }
+
+    normalizedInterests = [
+      ...new Set(
+        research_interests
+          .map((interest) => interest.trim())
+          .filter(Boolean)
+      ),
+    ];
+
+    if (normalizedInterests.length > 20) {
+      return {
+        valid: false,
+        error: "You can select up to 20 research interests.",
+      };
+    }
+  }
+
   return {
     valid: true,
     sanitized: {
@@ -134,6 +189,70 @@ export const validateRegisterPayload = (payload) => {
       email: email.trim().toLowerCase(),
       password, // Never trim or alter passwords.
       role: userRole,
+      affiliation: affiliation ? affiliation.trim() : null,
+      research_interests: normalizedInterests,
+    },
+  };
+};
+
+export const isAllowedInstitutionalEmail = (email, allowedDomains = []) => {
+  if (typeof email !== "string" || !email.includes("@")) return false;
+  const domain = email.trim().toLowerCase().split("@").pop();
+  if (!allowedDomains || allowedDomains.length === 0) return false;
+  return allowedDomains.some(
+    (allowedDomain) =>
+      domain === allowedDomain || domain.endsWith(`.${allowedDomain}`)
+  );
+};
+
+export const validateVerifyEmailPayload = (payload) => {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return { valid: false, error: "Invalid request body." };
+  }
+
+  const { token } = payload;
+
+  if (typeof token !== "string" || !/^[a-f0-9]{64}$/i.test(token.trim())) {
+    return {
+      valid: false,
+      error: "A valid 64-character verification token is required.",
+    };
+  }
+
+  return {
+    valid: true,
+    sanitized: {
+      token: token.trim().toLowerCase(),
+    },
+  };
+};
+
+export const validateResendVerificationPayload = (payload) => {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return { valid: false, error: "Invalid request body." };
+  }
+
+  const { email } = payload;
+
+  if (typeof email !== "string" || !email.trim()) {
+    return { valid: false, error: "Email is required." };
+  }
+
+  const emailResult = validateEmail(email);
+  if (!emailResult.valid) return emailResult;
+
+  return {
+    valid: true,
+    sanitized: {
+      email: email.trim().toLowerCase(),
     },
   };
 };

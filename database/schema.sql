@@ -80,6 +80,7 @@ CREATE TABLE users (
     role          user_role    NOT NULL DEFAULT 'STUDENT',
     affiliation   VARCHAR(255),
     research_interests TEXT[]       NOT NULL DEFAULT '{}',
+    email_verified BOOLEAN          NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -390,6 +391,47 @@ CREATE INDEX idx_password_reset_tokens_token_hash ON password_reset_tokens (toke
 
 -- Fast lookup of user's active reset tokens to invalidate prior tokens. [DB]
 CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens (user_id);
+
+
+-- ------------------------------------------------------------------------------
+-- TABLE: email_verification_tokens
+--
+-- Stores SHA-256 hashes of expiring (24-hour) single-use email verification tokens.
+-- ------------------------------------------------------------------------------
+CREATE TABLE email_verification_tokens (
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID        NOT NULL
+                           REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens (user_id);
+
+
+-- ------------------------------------------------------------------------------
+-- TABLE: sso_identities
+--
+-- Stores external identity provider subject mappings (e.g., Google Workspace).
+-- Prevents duplicate federated associations and binds to local users.
+-- ------------------------------------------------------------------------------
+CREATE TABLE sso_identities (
+    id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             UUID         NOT NULL
+                                     REFERENCES users(id) ON DELETE CASCADE,
+    provider            VARCHAR(50)  NOT NULL,
+    provider_subject_id VARCHAR(255) NOT NULL,
+    email               VARCHAR(255),
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_sso_provider_subject UNIQUE (provider, provider_subject_id)
+);
+
+CREATE INDEX idx_sso_identities_user_id ON sso_identities (user_id);
+CREATE INDEX idx_sso_identities_provider_email ON sso_identities (provider, LOWER(email));
 
 
 -- ==============================================================================

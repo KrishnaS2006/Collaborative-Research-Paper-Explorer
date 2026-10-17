@@ -8,7 +8,7 @@
 import { env } from "../config/env.js";
 
 export const getValidatedJwtSecret = () => {
-  const secret = env.jwtSecret;
+  const secret = process.env.JWT_SECRET;
 
   if (!secret || typeof secret !== 'string' || secret.trim().length === 0) {
     throw new Error('JWT_SECRET environment variable is missing or empty.');
@@ -18,5 +18,5 @@ export const getValidatedJwtSecret = () => {
     throw new Error('JWT_SECRET must be at least 32 characters long in production.');
   }
   return secret.trim();
-}
+};
 
