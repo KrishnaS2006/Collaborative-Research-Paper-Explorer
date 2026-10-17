@@ -365,7 +365,7 @@ export const requestPasswordReset = async ({ email } = {}) => {
   }
 
   const result = { message: GENERIC_PASSWORD_RESET_MESSAGE };
-  if (process.env.NODE_ENV !== "production" || process.env.EXPOSE_DEV_RESET_TOKEN === "true") {
+  if (process.env.EXPOSE_DEV_RESET_TOKEN === "true") {
     result.devResetToken = rawToken;
   }
   return result;
