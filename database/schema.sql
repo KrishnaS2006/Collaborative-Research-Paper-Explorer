@@ -79,6 +79,7 @@ CREATE TABLE users (
     full_name     VARCHAR(150) NOT NULL,
     role          user_role    NOT NULL DEFAULT 'STUDENT',
     affiliation   VARCHAR(255),
+    research_interests TEXT[]       NOT NULL DEFAULT '{}',
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -86,12 +87,17 @@ CREATE TABLE users (
     CONSTRAINT chk_users_email_format CHECK (
         email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$'
     ),
-    -- Prevent empty strings where meaningful text is required.
+    -- Full name empty not allowed
     CONSTRAINT chk_users_full_name_nonempty CHECK (
         TRIM(full_name) <> ''
+    ),
+    -- Ensure research interests are not null.
+    CONSTRAINT chk_users_research_interests_notnull CHECK (
+        research_interests IS NOT NULL
     )
 );
 
+CREATE INDEX idx_users_research_interests ON users USING GIN (research_interests);
 -- Case-insensitive unique email. [DB]
 CREATE UNIQUE INDEX idx_users_email_ci ON users (LOWER(email));
 
