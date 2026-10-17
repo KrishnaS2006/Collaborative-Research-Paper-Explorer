@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/authenticate.js';
 
 describe('Authentication Middleware (authenticateToken)', () => {
   const TEST_SECRET = 'a_very_secure_test_jwt_secret_with_at_least_32_characters_123!';

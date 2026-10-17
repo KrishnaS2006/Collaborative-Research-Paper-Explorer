@@ -50,7 +50,7 @@ export const authenticateToken = (req, res, next) => {
     if (
       !decoded ||
       typeof decoded !== "object" ||
-      !decoded._id
+      (!decoded._id && !decoded.id)
     ) {
       return res.status(401).json({
         error: "Invalid token payload.",
@@ -58,6 +58,8 @@ export const authenticateToken = (req, res, next) => {
     }
 
     req.user = decoded;
+    if (!req.user.id && req.user._id) req.user.id = req.user._id;
+    if (!req.user._id && req.user.id) req.user._id = req.user.id;
 
     return next();
   } catch {

@@ -1,10 +1,26 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+const POPULAR_INTERESTS = [
+  'Machine Learning',
+  'Natural Language Processing',
+  'Computer Vision',
+  'Deep Learning',
+  'Quantum Computing',
+  'Bioinformatics',
+  'Robotics',
+  'Cybersecurity',
+  'Human-Computer Interaction',
+  'Data Science',
+];
 
 export default function Register() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [affiliation, setAffiliation] = useState('');
+  const [researchInterests, setResearchInterests] = useState([]);
+  const [customInterest, setCustomInterest] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -12,9 +28,9 @@ export default function Register() {
   const [role, setRole] = useState('STUDENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState(null);
 
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   // Password policy criteria
   const isLengthValid = password.length >= 8;
@@ -28,6 +44,41 @@ export default function Register() {
   const passwordsMatch =
     confirmPassword.length > 0 && password === confirmPassword;
 
+  const handleAddInterest = (tag) => {
+    const trimmed = (tag || customInterest).trim();
+    if (!trimmed) return;
+
+    if (researchInterests.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+      setError(`"${trimmed}" is already added.`);
+      return;
+    }
+
+    if (researchInterests.length >= 20) {
+      setError('You can add up to 20 research interests.');
+      return;
+    }
+
+    if (trimmed.length > 50) {
+      setError('Research interest cannot exceed 50 characters.');
+      return;
+    }
+
+    setError('');
+    setResearchInterests([...researchInterests, trimmed]);
+    setCustomInterest('');
+  };
+
+  const handleRemoveInterest = (tagToRemove) => {
+    setResearchInterests(researchInterests.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleKeyDownInterest = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddInterest();
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -35,11 +86,12 @@ export default function Register() {
     if (
       !fullName.trim() ||
       !email.trim() ||
+      !affiliation.trim() ||
       !password ||
       !confirmPassword ||
       !role
     ) {
-      setError('Please fill in all fields.');
+      setError('Please fill in all required fields.');
       return;
     }
 
@@ -57,15 +109,60 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await register(fullName.trim(), email.trim(), password, role);
-      alert(`Registration successful as ${role}! Please sign in.`);
-      navigate('/login');
+      await register({
+        full_name: fullName.trim(),
+        email: email.trim(),
+        password,
+        role,
+        affiliation: affiliation.trim(),
+        research_interests: researchInterests,
+      });
+
+      setRegisteredEmail(email.trim());
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
+      setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (registeredEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-100 font-sans py-10 px-4">
+        <div className="relative bg-white/95 backdrop-blur-sm p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-lg border border-white/50 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg text-3xl text-white">
+            ✉️
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+            Verify Your Email Address
+          </h2>
+          <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+            Your account has been created successfully! We sent a verification link to:
+          </p>
+          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-800 font-semibold text-sm mb-6 break-all">
+            {registeredEmail}
+          </div>
+          <p className="text-slate-500 text-xs mb-6">
+            Please check your inbox and click the verification link to activate your account before logging in. If you don't see it, check your spam folder.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link
+              to="/login"
+              className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold shadow hover:from-indigo-700 hover:to-purple-700 transition"
+            >
+              Go to Sign In
+            </Link>
+            <Link
+              to={`/verify-email?email=${encodeURIComponent(registeredEmail)}`}
+              className="w-full py-2.5 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition"
+            >
+              Verify Token or Resend Link
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-100 font-sans py-10 px-4">
@@ -75,7 +172,7 @@ export default function Register() {
         <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse" />
       </div>
 
-      <div className="relative bg-white/90 backdrop-blur-sm p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-md border border-white/50">
+      <div className="relative bg-white/95 backdrop-blur-sm p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-xl border border-white/50">
         {/* Brand/Logo */}
         <div className="flex justify-center mb-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
@@ -86,7 +183,7 @@ export default function Register() {
         <h1 className="text-2xl md:text-3xl font-bold text-center text-slate-800 mb-1">
           Create an Account
         </h1>
-        <p className="text-center text-slate-500 text-sm mb-8">
+        <p className="text-center text-slate-500 text-sm mb-6">
           Join <span className="font-semibold text-indigo-600">Paper Explorer</span> today
         </p>
 
@@ -99,13 +196,79 @@ export default function Register() {
         )}
 
         <form onSubmit={handleSubmit} noValidate>
+          {/* Role Selection */}
+          <div className="mb-5">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              I am joining as a...
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* STUDENT Option */}
+              <label
+                className={`cursor-pointer border-2 rounded-xl p-3 text-center transition duration-200 ${
+                  role === 'STUDENT'
+                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
+                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value="STUDENT"
+                  checked={role === 'STUDENT'}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="hidden"
+                />
+                <div className="text-xl">🎓</div>
+                <div className="font-semibold text-slate-800 text-sm mt-1">
+                  Student
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Learning & exploring
+                </div>
+              </label>
+
+              {/* RESEARCHER Option */}
+              <label
+                className={`cursor-pointer border-2 rounded-xl p-3 text-center transition duration-200 ${
+                  role === 'RESEARCHER'
+                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
+                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value="RESEARCHER"
+                  checked={role === 'RESEARCHER'}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="hidden"
+                />
+                <div className="text-xl">🔬</div>
+                <div className="font-semibold text-slate-800 text-sm mt-1">
+                  Researcher
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Publishing & collaborating
+                </div>
+              </label>
+            </div>
+            {role === 'RESEARCHER' && (
+              <div className="mt-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-lg flex items-start gap-1.5">
+                <span className="font-bold text-sm leading-none mt-0.5">ℹ️</span>
+                <span>
+                  Researcher accounts require an approved institutional email address (e.g. university or research institution domain).
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Full Name */}
           <div className="mb-4">
             <label
               htmlFor="fullName"
               className="block mb-2 text-sm font-semibold text-slate-700"
             >
-              Full Name
+              Full Name <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">
@@ -116,7 +279,7 @@ export default function Register() {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="John Doe"
+                placeholder="Dr. Jane Smith or Alex Doe"
                 autoComplete="name"
                 required
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
@@ -130,7 +293,12 @@ export default function Register() {
               htmlFor="email"
               className="block mb-2 text-sm font-semibold text-slate-700"
             >
-              Email Address
+              Email Address <span className="text-red-500">*</span>
+              {role === 'RESEARCHER' && (
+                <span className="text-xs font-normal text-indigo-600 ml-1">
+                  (Institutional email)
+                </span>
+              )}
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">
@@ -141,11 +309,115 @@ export default function Register() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={role === 'RESEARCHER' ? 'jane@stanford.edu' : 'alex@example.com'}
                 autoComplete="email"
                 required
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
               />
+            </div>
+          </div>
+
+          {/* Affiliation / Institution */}
+          <div className="mb-4">
+            <label
+              htmlFor="affiliation"
+              className="block mb-2 text-sm font-semibold text-slate-700"
+            >
+              Affiliation / Institution <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">
+                🏛️
+              </span>
+              <input
+                id="affiliation"
+                type="text"
+                value={affiliation}
+                onChange={(e) => setAffiliation(e.target.value)}
+                placeholder="e.g. Stanford University, MIT, Oxford, IISc"
+                maxLength={255}
+                required
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+              />
+            </div>
+          </div>
+
+          {/* Research Interests (Tags) */}
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-2">
+              <label
+                htmlFor="customInterest"
+                className="text-sm font-semibold text-slate-700"
+              >
+                Research Interests
+              </label>
+              <span className="text-xs text-slate-500">
+                {researchInterests.length}/20 added
+              </span>
+            </div>
+
+            {/* Input + Add button */}
+            <div className="flex gap-2 mb-2">
+              <input
+                id="customInterest"
+                type="text"
+                value={customInterest}
+                onChange={(e) => setCustomInterest(e.target.value)}
+                onKeyDown={handleKeyDownInterest}
+                placeholder="Type an interest and press Enter or Add"
+                maxLength={50}
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddInterest()}
+                disabled={!customInterest.trim() || researchInterests.length >= 20}
+                className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                + Add
+              </button>
+            </div>
+
+            {/* Selected Tags Display */}
+            {researchInterests.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 p-2.5 bg-slate-50 border border-slate-200 rounded-lg mb-2.5">
+                {researchInterests.map((interest) => (
+                  <span
+                    key={interest}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-medium"
+                  >
+                    <span>{interest}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveInterest(interest)}
+                      aria-label={`Remove ${interest}`}
+                      className="hover:text-red-600 rounded-full focus:outline-none font-bold ml-0.5"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Popular Suggestions */}
+            <div>
+              <p className="text-xs text-slate-500 mb-1.5">Suggested interests (click to add):</p>
+              <div className="flex flex-wrap gap-1.5">
+                {POPULAR_INTERESTS.filter(
+                  (item) => !researchInterests.some((t) => t.toLowerCase() === item.toLowerCase())
+                ).slice(0, 7).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => handleAddInterest(item)}
+                    disabled={researchInterests.length >= 20}
+                    className="text-xs px-2.5 py-1 border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-600 rounded-full transition disabled:opacity-50"
+                  >
+                    + {item}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -155,7 +427,7 @@ export default function Register() {
               htmlFor="password"
               className="block mb-2 text-sm font-semibold text-slate-700"
             >
-              Password
+              Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">
@@ -231,7 +503,7 @@ export default function Register() {
               htmlFor="confirmPassword"
               className="block mb-2 text-sm font-semibold text-slate-700"
             >
-              Confirm Password
+              Confirm Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base">
@@ -273,64 +545,6 @@ export default function Register() {
                 {passwordsMatch ? '✓ Passwords match' : '✗ Passwords do not match'}
               </p>
             )}
-          </div>
-
-          {/* Role Selection */}
-          <div className="mb-6">
-            <label className="block mb-2 text-sm font-semibold text-slate-700">
-              I am a...
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {/* STUDENT Option */}
-              <label
-                className={`cursor-pointer border-2 rounded-xl p-3 text-center transition duration-200 ${
-                  role === 'STUDENT'
-                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
-                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value="STUDENT"
-                  checked={role === 'STUDENT'}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="hidden"
-                />
-                <div className="text-xl">🎓</div>
-                <div className="font-semibold text-slate-800 text-sm mt-1">
-                  Student
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                  Learning & exploring
-                </div>
-              </label>
-
-              {/* RESEARCHER Option */}
-              <label
-                className={`cursor-pointer border-2 rounded-xl p-3 text-center transition duration-200 ${
-                  role === 'RESEARCHER'
-                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
-                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value="RESEARCHER"
-                  checked={role === 'RESEARCHER'}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="hidden"
-                />
-                <div className="text-xl">🔬</div>
-                <div className="font-semibold text-slate-800 text-sm mt-1">
-                  Researcher
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                  Publishing & collaborating
-                </div>
-              </label>
-            </div>
           </div>
 
           {/* Submit */}

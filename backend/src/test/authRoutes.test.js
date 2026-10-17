@@ -2,7 +2,8 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import authRoutes from '../routes/auth.js';
+import authRoutes from '../routes/auth.routes.js';
+import errorHandler from '../middleware/errorHandler.js';
 import { loginRateLimiter } from '../middleware/rateLimiter.js';
 
 describe('Auth Router Integration (HTTP Endpoints)', () => {
@@ -19,6 +20,7 @@ describe('Auth Router Integration (HTTP Endpoints)', () => {
     app.use(express.json());
     app.use(cookieParser());
     app.use('/api/auth', authRoutes);
+    app.use(errorHandler);
 
     await new Promise((resolve) => {
       server = app.listen(0, () => {

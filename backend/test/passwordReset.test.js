@@ -4,23 +4,24 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import pool from '../db.js';
-import authRoutes from '../routes/auth.js';
+import pool from '../src/config/database.js';
+import authRoutes from '../src/routes/auth.routes.js';
+import errorHandler from '../src/middleware/errorHandler.js';
 import {
   forgotPasswordRateLimiter,
   resetPasswordRateLimiter,
   loginRateLimiter,
-} from '../middleware/rateLimiter.js';
+} from '../src/middleware/rateLimiter.js';
 import {
   validateForgotPasswordPayload,
   validateResetPasswordPayload,
-} from '../utils/validation.js';
+} from '../src/utils/validation.js';
 import {
   sendPasswordResetEmail,
   createSmtpTransporter,
   _setTransporterForTesting,
   _resetTransporterForTesting,
-} from '../utils/emailService.js';
+} from '../src/utils/emailService.js';
 
 describe('Password Reset Feature Test Suite', () => {
   let app;
@@ -41,6 +42,7 @@ describe('Password Reset Feature Test Suite', () => {
     app.use(express.json());
     app.use(cookieParser());
     app.use('/api/auth', authRoutes);
+    app.use(errorHandler);
 
     await new Promise((resolve) => {
       server = app.listen(0, () => {

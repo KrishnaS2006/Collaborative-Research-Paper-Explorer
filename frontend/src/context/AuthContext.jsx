@@ -13,9 +13,8 @@ export const AuthProvider = ({ children }) => {
       try {
         const res = await axios.get('/api/auth/me', { withCredentials: true });
         setUser(res.data.user);
-      } catch (err) {
+      } catch {
         // 401 ka matlab hai user logged in nahi hai — yeh expected hai
-        // Console mein error dikhane ki zaroorat nahi
         setUser(null);
       } finally {
         setLoading(false);
@@ -35,14 +34,58 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
-  const register = async (full_name, email, password, role) => {
-  const res = await axios.post(
-    '/api/auth/register',
-    { full_name, email, password, role },
-    { withCredentials: true }
-  );
-  return res.data;
-};
+  const register = async (fullNameOrObj, email, password, role, affiliation, researchInterests) => {
+    let payload;
+    if (typeof fullNameOrObj === 'object' && fullNameOrObj !== null) {
+      payload = {
+        full_name: fullNameOrObj.full_name || fullNameOrObj.fullName,
+        email: fullNameOrObj.email,
+        password: fullNameOrObj.password,
+        role: fullNameOrObj.role,
+        affiliation: fullNameOrObj.affiliation,
+        research_interests: fullNameOrObj.research_interests || fullNameOrObj.researchInterests || [],
+      };
+    } else {
+      payload = {
+        full_name: fullNameOrObj,
+        email,
+        password,
+        role,
+        affiliation,
+        research_interests: researchInterests || [],
+      };
+    }
+
+    const res = await axios.post(
+      '/api/auth/register',
+      payload,
+      { withCredentials: true }
+    );
+    return res.data;
+  };
+
+  const verifyEmail = async (token) => {
+    const res = await axios.post(
+      '/api/auth/verify-email',
+      { token },
+      { withCredentials: true }
+    );
+    return res.data;
+  };
+
+  const resendVerification = async (email) => {
+    const res = await axios.post(
+      '/api/auth/resend-verification',
+      { email },
+      { withCredentials: true }
+    );
+    return res.data;
+  };
+
+  const getSsoConfig = async () => {
+    const res = await axios.get('/api/auth/sso/config', { withCredentials: true });
+    return res.data;
+  };
 
   const logout = async () => {
     await axios.post('/api/auth/logout', {}, { withCredentials: true });
@@ -69,11 +112,24 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, register, logout, loading, forgotPassword, resetPassword }}
+      value={{
+        user,
+        setUser,
+        login,
+        register,
+        verifyEmail,
+        resendVerification,
+        getSsoConfig,
+        logout,
+        loading,
+        forgotPassword,
+        resetPassword,
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

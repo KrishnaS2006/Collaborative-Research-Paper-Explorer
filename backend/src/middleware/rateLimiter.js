@@ -105,4 +105,18 @@ export const resetPasswordRateLimiter = createRateLimiter({
   message: "Too many password reset attempts. Please try again later.",
 });
 
+// Resend-verification endpoint limiter.
+export const resendVerificationRateLimiter = createRateLimiter({
+  windowMs: process.env.RESEND_VERIFICATION_RATE_LIMIT_WINDOW_MS,
+  max: process.env.RESEND_VERIFICATION_RATE_LIMIT_MAX_ATTEMPTS || 5,
+  message: "Too many verification requests. Please try again later.",
+});
+
+// SSO callback rate limiter.
+export const ssoCallbackRateLimiter = createRateLimiter({
+  windowMs: process.env.SSO_CALLBACK_RATE_LIMIT_WINDOW_MS,
+  max: process.env.SSO_CALLBACK_RATE_LIMIT_MAX_ATTEMPTS || 10,
+  message: "Too many single sign-on attempts. Please try again later.",
+});
+
 export default createRateLimiter;
