@@ -257,6 +257,7 @@ The backend's authentication workflow is designed around:
 8. Sending password-reset emails through the configured email service.
 9. Server-side token invalidation upon logout (clearing cookies and revoking active sessions on the server).
 10. Automatic session expiration after 30 minutes of inactivity (idle tracking) with rolling cookie updates and client-side inactivity warning.
+11. Role-Based Access Control (RBAC) and permission enforcement across `STUDENT`, `RESEARCHER`, and `SYSTEM ADMIN` / `SYSTEM_ADMIN` roles, with role normalization, authorization middleware (`authorize`, `requirePermission`), and privileged role assignment.
 
 Reset tokens and session tokens should be handled securely and must expire. Do not log or expose production credentials or sensitive tokens.
 

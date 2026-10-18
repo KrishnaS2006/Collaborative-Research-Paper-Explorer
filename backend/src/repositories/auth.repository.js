@@ -450,3 +450,42 @@ export const revokeAllUserSessions = async (userId) => {
   return result.rowCount;
 };
 
+/* ==============================================================================
+ * ROLE & USER ADMINISTRATION REPOSITORY METHODS
+ * ============================================================================== */
+
+export const updateUserRole = async (userId, role) => {
+  const result = await pool.query(
+    `UPDATE users
+     SET role = $1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2
+     RETURNING id, email, full_name, role, affiliation, research_interests, email_verified, updated_at`,
+    [role, userId]
+  );
+  return result.rows[0] ?? null;
+};
+
+export const findAllUsers = async ({ limit = 50, offset = 0, role = null } = {}) => {
+  let query = `
+    SELECT id, email, full_name, role, affiliation, research_interests, email_verified, created_at
+    FROM users
+  `;
+  const params = [];
+
+  if (role) {
+    params.push(role);
+    query += ` WHERE role = $${params.length}`;
+  }
+
+  params.push(limit);
+  query += ` ORDER BY created_at DESC LIMIT $${params.length}`;
+
+  params.push(offset);
+  query += ` OFFSET $${params.length}`;
+
+  const result = await pool.query(query, params);
+  return result.rows;
+};
+
+

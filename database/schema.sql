@@ -25,7 +25,8 @@
 CREATE TYPE user_role AS ENUM (
     'STUDENT',
     'RESEARCHER',
-    'SYSTEM_ADMIN'
+    'SYSTEM_ADMIN',
+    'SYSTEM ADMIN'
 );
 
 -- Collaboration roles within a collection.
@@ -116,7 +117,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 CREATE OR REPLACE FUNCTION fn_block_public_admin_insert()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.role = 'SYSTEM_ADMIN' THEN
+    IF NEW.role::text = 'SYSTEM_ADMIN' OR NEW.role::text = 'SYSTEM ADMIN' THEN
         RAISE EXCEPTION
             'Direct INSERT with role SYSTEM_ADMIN is not permitted. '
             'Use the privileged admin-provisioning procedure.';

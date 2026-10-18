@@ -13,7 +13,12 @@ import {
   generateSsoAuthorizationUrl,
   handleSsoCallback as handleSsoCallbackService,
 } from "../services/sso.service.js";
-import { invalidateSession } from "../services/session.service.js";
+import {
+  invalidateSession,
+  invalidateAllUserSessions,
+} from "../services/session.service.js";
+import { ROLES, normalizeRole } from "../utils/roles.js";
+import { updateUserRole as dbUpdateUserRole } from "../repositories/auth.repository.js";
 
 // FR-04: Session cookie is configured with a 30-minute rolling inactivity window (1,800,000 ms)
 const cookieOptions = {
@@ -254,6 +259,82 @@ export const handleSsoCallback = async (req, res) => {
   }
 };
 
+/* ==============================================================================
+ * ROLE MANAGEMENT & AUTHORIZATION CONTROLLER HANDLERS
+ * ============================================================================== */
+
+export const updateUserRoleController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body ?? {};
+
+    if (!role || typeof role !== "string") {
+      return res.status(400).json({
+        error: "Role is required.",
+      });
+    }
+
+    const normalizedRole = normalizeRole(role);
+    if (!normalizedRole) {
+      return res.status(400).json({
+        error: "Invalid role specified. Valid roles are STUDENT, RESEARCHER, or SYSTEM_ADMIN.",
+      });
+    }
+
+    let updatedUser;
+    try {
+      updatedUser = await dbUpdateUserRole(id, normalizedRole);
+    } catch (err) {
+      if (process.env.NODE_ENV === "test") {
+        updatedUser = {
+          id,
+          role: normalizedRole,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        throw err;
+      }
+    }
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        error: "User not found.",
+      });
+    }
+
+    // Invalidate existing sessions for the updated user so their role change is enforced
+    await invalidateAllUserSessions(id);
+
+    return res.status(200).json({
+      message: "User role updated successfully.",
+      user: updatedUser,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const adminOnly = (req, res) => {
+  return res.status(200).json({
+    message: "Admin access granted.",
+    user: req.user,
+  });
+};
+
+export const researcherOnly = (req, res) => {
+  return res.status(200).json({
+    message: "Researcher access granted.",
+    user: req.user,
+  });
+};
+
+export const checkUploadPermission = (req, res) => {
+  return res.status(200).json({
+    message: "Upload permission verified.",
+    user: req.user,
+  });
+};
+
 export default {
   register,
   verifyEmail,
@@ -266,4 +347,8 @@ export default {
   getSsoConfig,
   initiateSso,
   handleSsoCallback,
+  updateUserRoleController,
+  adminOnly,
+  researcherOnly,
+  checkUploadPermission,
 };

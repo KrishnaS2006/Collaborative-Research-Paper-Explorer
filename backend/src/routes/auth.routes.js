@@ -12,9 +12,20 @@ import {
   getSsoConfig,
   initiateSso,
   handleSsoCallback,
+  updateUserRoleController,
+  adminOnly,
+  researcherOnly,
+  checkUploadPermission,
 } from "../controllers/auth.controller.js";
 
 import { authenticateToken } from "../middleware/authenticate.js";
+import {
+  authorize,
+  requirePermission,
+  requireAdmin,
+  requireResearcher,
+} from "../middleware/authorize.js";
+import { ROLES, PERMISSIONS } from "../utils/roles.js";
 
 import {
   loginRateLimiter,
@@ -67,5 +78,31 @@ router.get("/sso/login", initiateSso);
 router.get("/sso/google", initiateSso);
 router.get("/sso/callback", ssoCallbackRateLimiter, handleSsoCallback);
 router.get("/google/callback", ssoCallbackRateLimiter, handleSsoCallback);
+
+// Role-based authorization & permission verification endpoints
+router.get(
+  "/admin-only",
+  authenticateToken,
+  authorize(ROLES.SYSTEM_ADMIN),
+  adminOnly
+);
+router.get(
+  "/researcher-only",
+  authenticateToken,
+  authorize(ROLES.RESEARCHER, ROLES.SYSTEM_ADMIN),
+  researcherOnly
+);
+router.post(
+  "/papers/check-upload-permission",
+  authenticateToken,
+  requirePermission(PERMISSIONS.PAPERS_UPLOAD),
+  checkUploadPermission
+);
+router.put(
+  "/users/:id/role",
+  authenticateToken,
+  authorize(ROLES.SYSTEM_ADMIN),
+  updateUserRoleController
+);
 
 export default router;

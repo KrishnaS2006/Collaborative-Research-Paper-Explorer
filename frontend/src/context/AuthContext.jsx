@@ -238,6 +238,43 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  // RBAC & Permission Helper Functions
+  const normalizeClientRole = (role) => {
+    if (!role || typeof role !== 'string') return null;
+    const clean = role.trim().toUpperCase().replace(/[\s\-]+/g, '_');
+    if (clean === 'SYSTEM_ADMIN' || clean === 'SYSTEMADMIN' || clean === 'ADMIN') return 'SYSTEM_ADMIN';
+    if (clean === 'RESEARCHER') return 'RESEARCHER';
+    if (clean === 'STUDENT') return 'STUDENT';
+    return null;
+  };
+
+  const hasRole = (...roles) => {
+    if (!user?.role) return false;
+    const userRole = normalizeClientRole(user.role);
+    return roles.flat().some((r) => normalizeClientRole(r) === userRole);
+  };
+
+  const isAdmin = hasRole('SYSTEM_ADMIN');
+  const isResearcher = hasRole('RESEARCHER');
+  const isStudent = hasRole('STUDENT');
+
+  const hasPermission = (permission) => {
+    if (isAdmin) return true;
+    if (isResearcher) {
+      return [
+        'papers:read',
+        'papers:upload',
+        'summaries:generate',
+        'collections:create',
+        'collections:manage',
+      ].includes(permission);
+    }
+    if (isStudent) {
+      return ['papers:read', 'summaries:generate', 'collections:create'].includes(permission);
+    }
+    return false;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -253,6 +290,11 @@ export const AuthProvider = ({ children }) => {
         forgotPassword,
         resetPassword,
         heartbeat,
+        hasRole,
+        hasPermission,
+        isAdmin,
+        isResearcher,
+        isStudent,
       }}
     >
       {children}
