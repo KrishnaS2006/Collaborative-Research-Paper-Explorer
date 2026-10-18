@@ -228,7 +228,3 @@ Contributions from team members are welcome. Please use feature branches and pul
 - Validate user input on the backend.
 - Use appropriate authorization checks for protected resources.
 - Keep dependencies updated.
-
-## License
-
-Add the project's chosen license here before distributing the software.
