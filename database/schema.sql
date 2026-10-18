@@ -28,6 +28,14 @@ CREATE TYPE user_role AS ENUM (
     'SYSTEM_ADMIN'
 );
 
+-- FR-05: Role-Based Access Control
+CREATE TYPE access_role AS ENUM (
+    'SYSTEM_ADMIN',
+    'LAB_ANNOTATOR',
+    'READ_ONLY_VIEWER'
+);
+
+
 -- Collaboration roles within a collection.
 CREATE TYPE collection_role AS ENUM (
     'OWNER',     -- Full control: rename, delete, manage members.
@@ -78,6 +86,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,          -- Argon2id / bcrypt hash only. [BACKEND]
     full_name     VARCHAR(150) NOT NULL,
     role          user_role    NOT NULL DEFAULT 'STUDENT',
+    access_role   access_role  NOT NULL DEFAULT 'READ_ONLY_VIEWER',
     affiliation   VARCHAR(255),
     research_interests TEXT[]       NOT NULL DEFAULT '{}',
     email_verified BOOLEAN          NOT NULL DEFAULT TRUE,
@@ -97,6 +106,11 @@ CREATE TABLE users (
         research_interests IS NOT NULL
     )
 );
+
+-- Index for role-based user lookups.
+CREATE INDEX idx_users_access_role
+ON users (access_role);
+
 
 CREATE INDEX idx_users_research_interests ON users USING GIN (research_interests);
 -- Case-insensitive unique email. [DB]

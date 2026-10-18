@@ -353,6 +353,7 @@ export const handleSsoCallback = async ({
       id: user.id,
       email: user.email,
       role: user.role,
+      access_role: user.access_role,
     },
     getValidatedJwtSecret(),
     { expiresIn: "8h" }
@@ -365,6 +366,7 @@ export const handleSsoCallback = async ({
       email: user.email,
       full_name: user.full_name,
       role: user.role,
+      access_role: user.access_role,
       affiliation: user.affiliation,
       research_interests: user.research_interests,
       email_verified: user.email_verified,

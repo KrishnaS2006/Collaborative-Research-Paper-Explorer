@@ -32,12 +32,20 @@ export default function Dashboard() {
             <p className="text-slate-700">
               <span className="font-semibold">Email:</span> {user?.email}
             </p>
-            <p className="text-slate-700">
-              <span className="font-semibold">Role:</span>{' '}
-              <span className="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 font-medium rounded text-xs">
+           <p className="text-slate-700">
+              <span className="font-semibold">Account Type:</span>{' '}
+             <span className="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 font-medium rounded text-xs">
                 {user?.role}
-              </span>
-            </p>
+            </span>
+          </p>
+
+          <p className="text-slate-700">
+             <span className="font-semibold">Access Level:</span>{' '}
+               <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 font-medium rounded text-xs">
+                   {user?.access_role ?? 'Not assigned'}
+               </span>
+          </p>
+
             {user?.affiliation && (
               <p className="text-slate-700">
                 <span className="font-semibold">Affiliation:</span> {user.affiliation}
