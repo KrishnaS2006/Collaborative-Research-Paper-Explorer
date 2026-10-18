@@ -255,8 +255,10 @@ The backend's authentication workflow is designed around:
 6. Generating a time-limited reset token.
 7. Validating the token before updating the password.
 8. Sending password-reset emails through the configured email service.
+9. Server-side token invalidation upon logout (clearing cookies and revoking active sessions on the server).
+10. Automatic session expiration after 30 minutes of inactivity (idle tracking) with rolling cookie updates and client-side inactivity warning.
 
-Reset tokens should be handled securely and must expire. Do not log or expose production credentials or sensitive tokens.
+Reset tokens and session tokens should be handled securely and must expire. Do not log or expose production credentials or sensitive tokens.
 
 ## 🌿 Git Workflow for Team Collaboration
 

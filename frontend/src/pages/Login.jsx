@@ -19,7 +19,12 @@ export default function Login() {
     const errorParam = searchParams.get('error');
     const messageParam = searchParams.get('message');
 
-    if (errorParam === 'institutional_domain_required') {
+    if (errorParam === 'session_expired') {
+      return (
+        messageParam ||
+        'Your session has expired due to 30 minutes of inactivity. Please sign in again.'
+      );
+    } else if (errorParam === 'institutional_domain_required') {
       return (
         messageParam ||
         'Institutional email required: Your Google account domain is not authorized for institutional access.'

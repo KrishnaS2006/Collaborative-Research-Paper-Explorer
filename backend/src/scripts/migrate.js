@@ -11,6 +11,7 @@ async function runMigrations() {
   const migrationFiles = [
     '20261017_email_verification.sql',
     '20261017_sso_identities.sql',
+    '20261018_sessions.sql',
   ];
 
   console.log('--- Starting Database Migrations ---');

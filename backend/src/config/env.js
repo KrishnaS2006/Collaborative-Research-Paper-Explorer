@@ -44,4 +44,12 @@ export const env = {
       `${(process.env.BACKEND_URL || "http://localhost:5000").replace(/\/+$/, "")}/api/auth/sso/callback`,
     scopes: process.env.OIDC_SCOPES || "openid email profile",
   },
+
+  // FR-04: Session expiration & idle inactivity tracking
+  session: {
+    inactivityTimeoutMs:
+      Number(process.env.SESSION_INACTIVITY_TIMEOUT_MS) || 30 * 60 * 1000, // 30 minutes of inactivity
+    maxAgeMs:
+      Number(process.env.SESSION_MAX_AGE_MS) || 8 * 60 * 60 * 1000, // 8 hours absolute max
+  },
 };

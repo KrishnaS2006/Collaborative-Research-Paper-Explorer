@@ -433,6 +433,32 @@ CREATE TABLE sso_identities (
 CREATE INDEX idx_sso_identities_user_id ON sso_identities (user_id);
 CREATE INDEX idx_sso_identities_provider_email ON sso_identities (provider, LOWER(email));
 
+-- ------------------------------------------------------------------------------
+-- TABLE: user_sessions
+--
+-- FR-04: Manages active user sessions, server-side token revocation, and idle tracking.
+-- Tokens are looked up by secure SHA-256 hash.
+-- Sessions expire automatically after 30 minutes of inactivity (last_active_at)
+-- or upon reaching the absolute max expiration timestamp (expires_at).
+-- Revocation is tracked via revoked_at for explicit logout invalidation.
+-- ------------------------------------------------------------------------------
+CREATE TABLE user_sessions (
+    id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID         NOT NULL
+                                REFERENCES users(id) ON DELETE CASCADE,
+    token_hash     VARCHAR(64)  NOT NULL UNIQUE,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_active_at TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at     TIMESTAMPTZ  NOT NULL,
+    revoked_at     TIMESTAMPTZ,
+    user_agent     TEXT,
+    ip_address     VARCHAR(45)
+);
+
+CREATE INDEX idx_user_sessions_user_id ON user_sessions (user_id);
+CREATE INDEX idx_user_sessions_token_hash ON user_sessions (token_hash);
+CREATE INDEX idx_user_sessions_last_active_at ON user_sessions (last_active_at);
+
 
 -- ==============================================================================
 -- 4. FUTURE TABLES (not created yet -- described here for planning)
