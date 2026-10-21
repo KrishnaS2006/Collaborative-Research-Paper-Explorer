@@ -10,7 +10,7 @@ import pool from "../config/database.js";
 export const findUserByEmail = async (email) => {
   const result = await pool.query(
     `SELECT id, email, password_hash, full_name, role,
-            affiliation, research_interests, email_verified
+       access_role, affiliation, research_interests, email_verified
      FROM users
      WHERE LOWER(email) = LOWER($1)`,
     [email]
@@ -34,7 +34,7 @@ export const createUser = async ({
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id, email, full_name, role,
-               affiliation, research_interests, email_verified`,
+          access_role, affiliation, research_interests, email_verified`,
     [
       email,
       passwordHash,
@@ -51,7 +51,7 @@ export const createUser = async ({
 export const findUserById = async (id) => {
   const result = await pool.query(
     `SELECT id, email, full_name, role,
-            affiliation, research_interests, email_verified
+       access_role, affiliation, research_interests, email_verified
      FROM users
      WHERE id = $1`,
     [id]
@@ -245,7 +245,7 @@ export const consumeEmailVerificationToken = async (tokenHash) => {
        SET email_verified = TRUE,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
-       RETURNING id, email, full_name, role, affiliation, research_interests, email_verified`,
+       RETURNING id, email, full_name, role, access_role, affiliation, research_interests, email_verified`,
       [tokenRecord.user_id]
     );
 
@@ -338,7 +338,7 @@ export const createSsoUserWithIdentity = async ({
        )
        VALUES ($1, $2, $3, $4, $5, $6, TRUE)
        RETURNING id, email, full_name, role,
-                 affiliation, research_interests, email_verified`,
+          access_role, affiliation, research_interests, email_verified`,
       [
         email,
         passwordHash,

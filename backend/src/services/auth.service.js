@@ -131,14 +131,15 @@ export const registerUser = async (payload = {}) => {
   }
 
   const responseUser = {
-    id: newUser.id,
-    email: newUser.email,
-    full_name: newUser.full_name,
-    role: newUser.role,
-    affiliation: newUser.affiliation,
-    research_interests: newUser.research_interests,
-    email_verified: newUser.email_verified,
-  };
+  id: newUser.id,
+  email: newUser.email,
+  full_name: newUser.full_name,
+  role: newUser.role,
+  access_role: newUser.access_role,
+  affiliation: newUser.affiliation,
+  research_interests: newUser.research_interests,
+  email_verified: newUser.email_verified,
+};
 
   if (process.env.NODE_ENV !== "production") {
     responseUser.devVerificationToken = rawVerificationToken;
@@ -275,11 +276,12 @@ export const loginUser = async (payload = {}) => {
 
   const token = jwt.sign(
     {
-      _id: user.id,
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      affiliation: user.affiliation,
+       _id: user.id,
+  id: user.id,
+  email: user.email,
+  role: user.role,
+  access_role: user.access_role,
+  affiliation: user.affiliation,
     },
     getValidatedJwtSecret(),
     { expiresIn: "8h" }
@@ -298,6 +300,7 @@ export const loginUser = async (payload = {}) => {
       email: user.email,
       full_name: user.full_name,
       role: user.role,
+      access_role: user.access_role,
       affiliation: user.affiliation,
       research_interests: user.research_interests,
       email_verified: user.email_verified,
@@ -317,6 +320,7 @@ export const getCurrentUserById = async (id) => {
     email: user.email,
     full_name: user.full_name,
     role: user.role,
+    access_role: user.access_role,
     affiliation: user.affiliation,
     research_interests: user.research_interests,
     email_verified: user.email_verified,

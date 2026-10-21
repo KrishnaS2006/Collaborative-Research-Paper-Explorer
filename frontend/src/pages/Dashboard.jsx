@@ -37,24 +37,20 @@ export default function Dashboard() {
             <p className="text-slate-700">
               <span className="font-semibold">Email:</span> {user?.email}
             </p>
-            <p className="text-slate-700">
-              <span className="font-semibold">Role:</span>{' '}
-              <span
-                className={`inline-block px-2.5 py-0.5 font-semibold rounded text-xs ${
-                  user?.role?.includes('ADMIN')
-                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                    : user?.role === 'RESEARCHER'
-                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
-                    : 'bg-sky-100 text-sky-700 border border-sky-200'
-                }`}
-              >
-                {user?.role?.includes('ADMIN')
-                  ? 'System Admin'
-                  : user?.role === 'RESEARCHER'
-                  ? 'Researcher'
-                  : 'Student'}
-              </span>
-            </p>
+           <p className="text-slate-700">
+              <span className="font-semibold">Account Type:</span>{' '}
+             <span className="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 font-medium rounded text-xs">
+                {user?.role}
+            </span>
+          </p>
+
+          <p className="text-slate-700">
+             <span className="font-semibold">Access Level:</span>{' '}
+               <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 font-medium rounded text-xs">
+                   {user?.access_role ?? 'Not assigned'}
+               </span>
+          </p>
+
             {user?.affiliation && (
               <p className="text-slate-700">
                 <span className="font-semibold">Affiliation:</span> {user.affiliation}
