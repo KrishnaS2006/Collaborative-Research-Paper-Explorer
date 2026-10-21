@@ -1,5 +1,6 @@
 
 // backend/src/utils/validation.js
+import { ROLES, normalizeRole } from "./roles.js";
 
 export const validateEmail = (email) => {
   if (!email || typeof email !== "string") {
@@ -120,12 +121,13 @@ export const validateRegisterPayload = (payload) => {
   const passwordResult = validatePassword(password);
   if (!passwordResult.valid) return passwordResult;
 
-  const userRole = role ?? "STUDENT";
-  const allowedRoles = ["STUDENT", "RESEARCHER"];
+  const rawRole = role ?? ROLES.STUDENT;
+  const userRole = normalizeRole(rawRole);
+  const allowedPublicRoles = [ROLES.STUDENT, ROLES.RESEARCHER];
 
   if (
-    typeof userRole !== "string" ||
-    !allowedRoles.includes(userRole)
+    !userRole ||
+    !allowedPublicRoles.includes(userRole)
   ) {
     return {
       valid: false,

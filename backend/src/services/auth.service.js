@@ -16,6 +16,7 @@ import {
 } from "../repositories/auth.repository.js";
 
 import { getValidatedJwtSecret } from "../utils/jwt.js";
+import { createSession } from "./session.service.js";
 import {
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
@@ -285,6 +286,12 @@ export const loginUser = async (payload = {}) => {
     getValidatedJwtSecret(),
     { expiresIn: "8h" }
   );
+
+  // FR-04: Register server-side session for idle tracking and revocation
+  await createSession({
+    userId: user.id,
+    token,
+  });
 
   return {
     token,

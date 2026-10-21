@@ -22,9 +22,14 @@ export default function Dashboard() {
               Collaborative Research Paper Explorer Dashboard
             </p>
           </div>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-            ✓ Authenticated
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+              ✓ Authenticated
+            </span>
+            <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+              ⏱ 30m Idle Protection
+            </span>
+          </div>
         </div>
 
         <div className="space-y-4 mb-8">

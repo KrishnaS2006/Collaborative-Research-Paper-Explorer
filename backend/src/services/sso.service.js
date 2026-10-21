@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { env } from "../config/env.js";
 import { getValidatedJwtSecret } from "../utils/jwt.js";
 import { isAllowedInstitutionalEmail } from "../utils/validation.js";
+import { createSession } from "./session.service.js";
 import {
   findSsoIdentity,
   linkSsoIdentityToUser,
@@ -358,6 +359,12 @@ export const handleSsoCallback = async ({
     getValidatedJwtSecret(),
     { expiresIn: "8h" }
   );
+
+  // FR-04: Register server-side session for idle tracking and revocation
+  await createSession({
+    userId: user.id,
+    token,
+  });
 
   return {
     token,

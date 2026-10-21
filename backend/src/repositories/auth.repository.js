@@ -381,3 +381,111 @@ export const checkSsoIdentitiesTable = async () => true;
 export const _setHasEmailVerifiedColumnCache = () => {};
 export const _setHasVerificationTokensTableCache = () => {};
 export const _setHasSsoIdentitiesTableCache = () => {};
+
+/* ==============================================================================
+ * FR-04: USER SESSIONS & TOKEN REVOCATION REPOSITORY METHODS
+ * ============================================================================== */
+
+export const createUserSession = async ({
+  userId,
+  tokenHash,
+  expiresAt,
+  lastActiveAt = new Date(),
+  userAgent = null,
+  ipAddress = null,
+}) => {
+  const result = await pool.query(
+    `INSERT INTO user_sessions
+       (user_id, token_hash, expires_at, last_active_at, user_agent, ip_address)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, user_id, token_hash, created_at, last_active_at, expires_at, revoked_at`,
+    [userId, tokenHash, expiresAt, lastActiveAt, userAgent, ipAddress]
+  );
+  return result.rows[0];
+};
+
+export const findUserSessionByTokenHash = async (tokenHash) => {
+  const result = await pool.query(
+    `SELECT id, user_id, token_hash, created_at, last_active_at, expires_at, revoked_at
+     FROM user_sessions
+     WHERE token_hash = $1`,
+    [tokenHash]
+  );
+  return result.rows[0] ?? null;
+};
+
+export const updateUserSessionActivity = async (
+  tokenHash,
+  lastActiveAt = new Date()
+) => {
+  const result = await pool.query(
+    `UPDATE user_sessions
+     SET last_active_at = $2
+     WHERE token_hash = $1 AND revoked_at IS NULL
+     RETURNING id, user_id, token_hash, last_active_at`,
+    [tokenHash, lastActiveAt]
+  );
+  return result.rows[0] ?? null;
+};
+
+export const revokeUserSession = async (tokenHash) => {
+  const result = await pool.query(
+    `UPDATE user_sessions
+     SET revoked_at = CURRENT_TIMESTAMP
+     WHERE token_hash = $1 AND revoked_at IS NULL
+     RETURNING id, user_id, token_hash, revoked_at`,
+    [tokenHash]
+  );
+  return result.rows[0] ?? null;
+};
+
+export const revokeAllUserSessions = async (userId) => {
+  const result = await pool.query(
+    `UPDATE user_sessions
+     SET revoked_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND revoked_at IS NULL
+     RETURNING id`,
+    [userId]
+  );
+  return result.rowCount;
+};
+
+/* ==============================================================================
+ * ROLE & USER ADMINISTRATION REPOSITORY METHODS
+ * ============================================================================== */
+
+export const updateUserRole = async (userId, role) => {
+  const result = await pool.query(
+    `UPDATE users
+     SET role = $1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2
+     RETURNING id, email, full_name, role, affiliation, research_interests, email_verified, updated_at`,
+    [role, userId]
+  );
+  return result.rows[0] ?? null;
+};
+
+export const findAllUsers = async ({ limit = 50, offset = 0, role = null } = {}) => {
+  let query = `
+    SELECT id, email, full_name, role, affiliation, research_interests, email_verified, created_at
+    FROM users
+  `;
+  const params = [];
+
+  if (role) {
+    params.push(role);
+    query += ` WHERE role = $${params.length}`;
+  }
+
+  params.push(limit);
+  query += ` ORDER BY created_at DESC LIMIT $${params.length}`;
+
+  params.push(offset);
+  query += ` OFFSET $${params.length}`;
+
+  const result = await pool.query(query, params);
+  return result.rows;
+};
+
+
