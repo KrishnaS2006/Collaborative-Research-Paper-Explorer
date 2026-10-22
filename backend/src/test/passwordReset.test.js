@@ -1,27 +1,49 @@
-import { describe, it, before, after, afterEach } from 'node:test';
+import './setup.js';
+import { describe, it, before, after, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import pool from '../src/config/database.js';
-import authRoutes from '../src/routes/auth.routes.js';
-import errorHandler from '../src/middleware/errorHandler.js';
+
+import pool from '../config/database.js';
+import authRoutes from '../routes/auth.routes.js';
+import errorHandler from '../middleware/errorHandler.js';
 import {
   forgotPasswordRateLimiter,
   resetPasswordRateLimiter,
   loginRateLimiter,
-} from '../src/middleware/rateLimiter.js';
+} from '../middleware/rateLimiter.js';
 import {
   validateForgotPasswordPayload,
   validateResetPasswordPayload,
-} from '../src/utils/validation.js';
+} from '../utils/validation.js';
 import {
   sendPasswordResetEmail,
   createSmtpTransporter,
   _setTransporterForTesting,
   _resetTransporterForTesting,
-} from '../src/utils/emailService.js';
+} from '../utils/emailService.js';
+import {
+  createSession,
+  validateSessionSync,
+  clearInMemorySessionsForTesting,
+  invalidateAllUserSessions,
+  setInvalidateAllUserSessionsForTesting,
+  resetInvalidateAllUserSessionsForTesting,
+} from '../services/session.service.js';
+import { resetUserPassword } from '../services/auth.service.js';
+import {
+  _setConsumePasswordResetTokenForTesting,
+  _resetConsumePasswordResetTokenForTesting,
+  _setFindUserByEmailForTesting,
+  _resetFindUserByEmailForTesting,
+  _setCreatePasswordResetTokenForTesting,
+  _resetCreatePasswordResetTokenForTesting,
+  _setInvalidateResetTokensForTesting,
+  _resetInvalidateResetTokensForTesting,
+} from '../repositories/auth.repository.js';
+import * as sessionService from '../services/session.service.js';
 
 describe('Password Reset Feature Test Suite', () => {
   let app;
@@ -34,10 +56,6 @@ describe('Password Reset Feature Test Suite', () => {
   let testUserId;
 
   before(async () => {
-    process.env.JWT_SECRET = 'super_secure_test_jwt_secret_with_32_characters_12345';
-    process.env.NODE_ENV = 'test';
-    process.env.EXPOSE_DEV_RESET_TOKEN = 'true';
-
     app = express();
     app.use(express.json());
     app.use(cookieParser());
@@ -52,7 +70,7 @@ describe('Password Reset Feature Test Suite', () => {
       });
     });
 
-    // Create test user in DB for full lifecycle test if DB is available
+    // Attempt to create test user in DB for full lifecycle test if live DB is available
     try {
       const salt = await bcrypt.genSalt(10);
       const hash = await bcrypt.hash(initialPassword, salt);
@@ -63,13 +81,13 @@ describe('Password Reset Feature Test Suite', () => {
         [testEmail, hash, 'Test User Reset', 'STUDENT']
       );
       testUserId = res.rows[0]?.id;
-    } catch (e) {
-      console.warn('DB user setup skipped (running without live DB):', e.message);
+    } catch {
+      // Running without live DB - integration tests requiring PostgreSQL will be skipped cleanly
     }
   });
 
   after(async () => {
-    // Clean up test records
+    // Clean up test records if live DB was connected
     if (testUserId) {
       try {
         await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [testUserId]);
@@ -82,6 +100,15 @@ describe('Password Reset Feature Test Suite', () => {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+
+  afterEach(() => {
+    _resetConsumePasswordResetTokenForTesting();
+    _resetFindUserByEmailForTesting();
+    _resetCreatePasswordResetTokenForTesting();
+    _resetInvalidateResetTokensForTesting();
+    _resetTransporterForTesting();
+    resetInvalidateAllUserSessionsForTesting();
   });
 
   describe('Validation Functions', () => {
@@ -128,6 +155,8 @@ describe('Password Reset Feature Test Suite', () => {
     });
 
     it('should return generic success response for unregistered email (no enumeration)', async () => {
+      _setFindUserByEmailForTesting(async () => null);
+
       const res = await fetch(`${baseUrl}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,6 +217,11 @@ describe('Password Reset Feature Test Suite', () => {
     });
 
     it('should return 400 for a nonexistent/invalid token', async () => {
+      _setConsumePasswordResetTokenForTesting(async () => ({
+        success: false,
+        reason: 'invalid',
+      }));
+
       const res = await fetch(`${baseUrl}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -225,10 +259,182 @@ describe('Password Reset Feature Test Suite', () => {
     });
   });
 
+  describe('Active Session Revocation After Password Reset', () => {
+    beforeEach(() => {
+      clearInMemorySessionsForTesting();
+    });
+
+    it('should revoke all active user sessions upon successful password reset', async () => {
+      const targetUserId = 'target-user-uuid-1111';
+      const otherUserId = 'other-user-uuid-2222';
+
+      // Register two active sessions for target user and one for another user
+      const session1Token = 'session_jwt_target_1';
+      const session2Token = 'session_jwt_target_2';
+      const otherToken = 'session_jwt_other_user';
+
+      await createSession({ userId: targetUserId, token: session1Token });
+      await createSession({ userId: targetUserId, token: session2Token });
+      await createSession({ userId: otherUserId, token: otherToken });
+
+      // Verify all three sessions are active initially
+      assert.equal(validateSessionSync(session1Token).valid, true);
+      assert.equal(validateSessionSync(session2Token).valid, true);
+      assert.equal(validateSessionSync(otherToken).valid, true);
+
+      // Mock repository to return success and target user id
+      _setConsumePasswordResetTokenForTesting(async () => ({
+        success: true,
+        userId: targetUserId,
+      }));
+
+      const result = await resetUserPassword({
+        token: 'mock_valid_token_32_characters_1234',
+        password: 'NewStrongPassword1!',
+      });
+
+      assert.ok(result.message);
+      assert.match(result.message, /Password has been reset successfully/i);
+
+      // Verify target user's sessions are now revoked
+      const check1 = validateSessionSync(session1Token);
+      const check2 = validateSessionSync(session2Token);
+      assert.equal(check1.valid, false, 'Session 1 must be revoked');
+      assert.equal(check1.reason, 'revoked');
+      assert.equal(check2.valid, false, 'Session 2 must be revoked');
+      assert.equal(check2.reason, 'revoked');
+
+      // Verify other user's session remains untouched and valid
+      const checkOther = validateSessionSync(otherToken);
+      assert.equal(checkOther.valid, true, "Other user's session must not be affected");
+    });
+
+    it('should reject reset and not revoke sessions when token is already used', async () => {
+      const targetUserId = 'target-user-already-used';
+      const activeToken = 'session_token_should_stay_active';
+      await createSession({ userId: targetUserId, token: activeToken });
+
+      _setConsumePasswordResetTokenForTesting(async () => ({
+        success: false,
+        reason: 'already_used',
+      }));
+
+      await assert.rejects(
+        async () => {
+          await resetUserPassword({
+            token: 'reused_token_123',
+            password: 'NewStrongPassword1!',
+          });
+        },
+        (err) => {
+          assert.equal(err.statusCode, 400);
+          assert.match(err.message, /already been used/i);
+          return true;
+        }
+      );
+
+      // Session must remain active since reset was rejected
+      assert.equal(validateSessionSync(activeToken).valid, true);
+    });
+
+    it('should reject reset and not revoke sessions when token is expired', async () => {
+      const targetUserId = 'target-user-expired';
+      const activeToken = 'session_token_expired_stay_active';
+      await createSession({ userId: targetUserId, token: activeToken });
+
+      _setConsumePasswordResetTokenForTesting(async () => ({
+        success: false,
+        reason: 'expired',
+      }));
+
+      await assert.rejects(
+        async () => {
+          await resetUserPassword({
+            token: 'expired_token_123',
+            password: 'NewStrongPassword1!',
+          });
+        },
+        (err) => {
+          assert.equal(err.statusCode, 400);
+          assert.match(err.message, /expired/i);
+          return true;
+        }
+      );
+
+      assert.equal(validateSessionSync(activeToken).valid, true);
+    });
+
+    it('should reject reset when token is invalid or non-existent', async () => {
+      _setConsumePasswordResetTokenForTesting(async () => ({
+        success: false,
+        reason: 'invalid',
+      }));
+
+      await assert.rejects(
+        async () => {
+          await resetUserPassword({
+            token: 'invalid_token_123',
+            password: 'NewStrongPassword1!',
+          });
+        },
+        (err) => {
+          assert.equal(err.statusCode, 400);
+          assert.match(err.message, /Invalid or expired/i);
+          return true;
+        }
+      );
+    });
+
+    it('should securely handle session invalidation failure by throwing error instead of reporting false success', async () => {
+      const targetUserId = 'target-user-invalidation-failure';
+
+      _setConsumePasswordResetTokenForTesting(async () => ({
+        success: true,
+        userId: targetUserId,
+      }));
+
+      // Create active session for the target user to ensure defense-in-depth cutoff
+      const session1Token = 'session_jwt_target_1_fail';
+      const session2Token = 'session_jwt_target_2_fail';
+      await createSession({ userId: targetUserId, token: session1Token });
+      await createSession({ userId: targetUserId, token: session2Token });
+
+      // Simulate unexpected error during session invalidation
+      setInvalidateAllUserSessionsForTesting(async () => {
+        throw new Error('Redis/DB connection failed during session invalidation');
+      });
+
+      await assert.rejects(
+        async () => {
+          await resetUserPassword({
+            token: 'mock_valid_token_32_characters_1234',
+            password: 'NewStrongPassword1!',
+          });
+        },
+        (err) => {
+          assert.equal(err.statusCode, 500);
+          assert.match(
+            err.message,
+            /Password has been reset, but revoking existing sessions encountered an error/i
+          );
+          return true;
+        }
+      );
+
+      // After failure, ensure sessions are still revoked via in-memory cutoff
+      const postFailureCheck1 = validateSessionSync(session1Token);
+      const postFailureCheck2 = validateSessionSync(session2Token);
+      assert.equal(postFailureCheck1.valid, false, 'Session 1 must be revoked via cutoff even if DB revocation fails');
+      assert.equal(postFailureCheck1.reason, 'revoked');
+      assert.equal(postFailureCheck2.valid, false, 'Session 2 must be revoked via cutoff even if DB revocation fails');
+      assert.equal(postFailureCheck2.reason, 'revoked');
+    });
+  });
+
   describe('End-to-End Forgot & Reset Password Lifecycle (Database Verified)', () => {
     it('should complete the full reset lifecycle: request, token hash in DB, reset, single-use, and login verification', async () => {
       if (!testUserId) {
-        console.log('Skipping DB lifecycle test because database is not connected.');
+        console.log('Skipping live DB lifecycle test because PostgreSQL is not connected (expected in unit test environment).');
         return;
       }
 
@@ -438,6 +644,14 @@ describe('Password Reset Feature Test Suite', () => {
       process.env.EMAIL_SERVICE_MODE = 'smtp';
       process.env.SMTP_USER = 'test@gmail.com';
       process.env.SMTP_PASS = 'mockpassword';
+
+      _setFindUserByEmailForTesting(async () => ({
+        id: 'mock-test-id-1234',
+        email: testEmail,
+        full_name: 'Dr. Researcher',
+      }));
+      _setInvalidateResetTokensForTesting(async () => {});
+      _setCreatePasswordResetTokenForTesting(async () => ({ id: 'token-uuid' }));
 
       _setTransporterForTesting({
         sendMail: async () => {

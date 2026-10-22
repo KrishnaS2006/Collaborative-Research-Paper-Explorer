@@ -44,9 +44,34 @@ export const resetSessionInactivityTimeoutForTesting = () => {
   customInactivityTimeoutMs = null;
 };
 
+const userRevocationCutoffs = new Map();
+
+export const recordUserPasswordReset = (userId, timestamp = new Date()) => {
+  if (!userId) return;
+  const cutoff = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  userRevocationCutoffs.set(userId, cutoff);
+
+  for (const [hash, session] of inMemorySessions.entries()) {
+    if (session.user_id === userId) {
+      const sessionCreated = session.created_at
+        ? new Date(session.created_at).getTime()
+        : 0;
+      if (sessionCreated <= cutoff.getTime()) {
+        session.revoked_at = cutoff;
+        inMemoryRevokedTokens.add(hash);
+      }
+    }
+  }
+};
+
+export const resetUserPasswordResetCutoffsForTesting = () => {
+  userRevocationCutoffs.clear();
+};
+
 export const clearInMemorySessionsForTesting = () => {
   inMemorySessions.clear();
   inMemoryRevokedTokens.clear();
+  userRevocationCutoffs.clear();
 };
 
 /**
@@ -118,7 +143,7 @@ export const createSession = async ({
  * 3. Checks if the session has exceeded 30 minutes of inactivity (idle timeout).
  * 4. Touches/updates the last_active_at timestamp if active.
  */
-export const validateSessionSync = (token) => {
+export const validateSessionSync = (token, decoded = null) => {
   if (!token || typeof token !== "string") {
     return { valid: false, reason: "missing_token" };
   }
@@ -134,14 +159,31 @@ export const validateSessionSync = (token) => {
 
   let session = inMemorySessions.get(tokenHash);
 
+  // Check user password-reset cutoff (enforces instant revocation even if separate step fails)
+  const targetUserId = session?.user_id || decoded?.id || decoded?._id;
+  if (targetUserId && userRevocationCutoffs.has(targetUserId)) {
+    const cutoff = userRevocationCutoffs.get(targetUserId);
+    const tokenCreatedMs = session?.created_at
+      ? new Date(session.created_at).getTime()
+      : (decoded?.iat ? decoded.iat * 1000 : now.getTime());
+    if (tokenCreatedMs <= cutoff.getTime()) {
+      inMemoryRevokedTokens.add(tokenHash);
+      if (session) {
+        session.revoked_at = cutoff;
+      }
+      return { valid: false, reason: "revoked" };
+    }
+  }
+
   // If no session found:
   // For backwards compatibility or synthetic tokens in unit tests,
   // register a fresh session tracking record starting from now.
   if (!session) {
     const autoSession = {
       id: crypto.randomUUID(),
+      user_id: targetUserId || null,
       token_hash: tokenHash,
-      created_at: now,
+      created_at: decoded?.iat ? new Date(decoded.iat * 1000) : now,
       last_active_at: now,
       expires_at: new Date(now.getTime() + (env.session?.maxAgeMs || 8 * 60 * 60 * 1000)),
       revoked_at: null,
@@ -296,10 +338,24 @@ export const invalidateSession = async (token) => {
   return true;
 };
 
+let testInvalidateAllUserSessionsHandler = null;
+
+export const setInvalidateAllUserSessionsForTesting = (fn) => {
+  testInvalidateAllUserSessionsHandler = fn;
+};
+
+export const resetInvalidateAllUserSessionsForTesting = () => {
+  testInvalidateAllUserSessionsHandler = null;
+};
+
 /**
  * Revokes all sessions for a specific user (e.g., password change or security reset).
  */
 export const invalidateAllUserSessions = async (userId) => {
+  if (testInvalidateAllUserSessionsHandler) {
+    return testInvalidateAllUserSessionsHandler(userId);
+  }
+
   if (!userId) return 0;
 
   const now = new Date();
@@ -333,6 +389,8 @@ export default {
   invalidateSessionSync,
   invalidateSession,
   invalidateAllUserSessions,
+  recordUserPasswordReset,
+  resetUserPasswordResetCutoffsForTesting,
   getSessionInactivityTimeout,
   setSessionInactivityTimeoutForTesting,
   resetSessionInactivityTimeoutForTesting,

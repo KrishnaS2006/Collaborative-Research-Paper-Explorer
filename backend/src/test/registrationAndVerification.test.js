@@ -1,3 +1,4 @@
+import './setup.js';
 import { describe, it, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
@@ -20,6 +21,16 @@ import {
   isAllowedInstitutionalEmail,
   validateRegisterPayload,
 } from "../utils/validation.js";
+import {
+  _setFindUserByEmailForTesting,
+  _resetFindUserByEmailForTesting,
+  _setCreateUserForTesting,
+  _resetCreateUserForTesting,
+  _setCreateEmailVerificationTokenForTesting,
+  _resetCreateEmailVerificationTokenForTesting,
+  _setConsumeEmailVerificationTokenForTesting,
+  _resetConsumeEmailVerificationTokenForTesting,
+} from "../repositories/auth.repository.js";
 
 describe("FR-01: User Registration & Email Verification Suite", () => {
   let app;
@@ -59,6 +70,10 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
     resetTransporterForTesting();
     resendVerificationRateLimiter.reset();
     loginRateLimiter.reset();
+    _resetFindUserByEmailForTesting();
+    _resetCreateUserForTesting();
+    _resetCreateEmailVerificationTokenForTesting();
+    _resetConsumeEmailVerificationTokenForTesting();
   });
 
   describe("Institutional Email Domain Matching Logic", () => {
@@ -242,6 +257,24 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
     });
 
     it("should handle email delivery failure safely without crashing registration", async () => {
+      // Mock repository methods so registration proceeds to email delivery
+      _setFindUserByEmailForTesting(async () => null);
+      _setCreateUserForTesting(async (u) => ({
+        id: "mock-user-uuid",
+        email: u.email,
+        full_name: u.fullName,
+        role: u.role,
+        access_role: "READ_ONLY_VIEWER",
+        affiliation: u.affiliation,
+        research_interests: u.researchInterests,
+        email_verified: false,
+      }));
+      _setCreateEmailVerificationTokenForTesting(async (t) => ({
+        id: "mock-token-uuid",
+        user_id: t.userId,
+        expires_at: t.expiresAt,
+      }));
+
       // Mock transporter that throws delivery error
       setTransporterForTesting({
         sendMail: async () => {
@@ -283,6 +316,11 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
     });
 
     it("POST /api/auth/verify-email should reject non-existent 64-char token (400)", async () => {
+      _setConsumeEmailVerificationTokenForTesting(async () => ({
+        success: false,
+        reason: "not_found",
+      }));
+
       const random64Token = crypto.randomBytes(32).toString("hex");
       const res = await fetch(`${baseUrl}/api/auth/verify-email`, {
         method: "POST",
@@ -296,6 +334,8 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
     });
 
     it("POST /api/auth/resend-verification should return generic message for non-existent email (no enumeration)", async () => {
+      _setFindUserByEmailForTesting(async () => null);
+
       const res = await fetch(`${baseUrl}/api/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

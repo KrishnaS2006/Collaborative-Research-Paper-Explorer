@@ -16,7 +16,11 @@ import {
 } from "../repositories/auth.repository.js";
 
 import { getValidatedJwtSecret } from "../utils/jwt.js";
-import { createSession } from "./session.service.js";
+import {
+  createSession,
+  invalidateAllUserSessions,
+  recordUserPasswordReset,
+} from "./session.service.js";
 import {
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
@@ -420,6 +424,27 @@ export const resetUserPassword = async (payload = {}) => {
       "Invalid or expired password reset token. Please request a new one.",
       400
     );
+  }
+
+  // Guaranteed immediate in-memory cutoff: makes all pre-existing sessions unusable
+  if (result.userId) {
+    recordUserPasswordReset(result.userId);
+  }
+
+  // Revoke all active sessions for this user across memory and database
+  if (result.userId) {
+    try {
+      await invalidateAllUserSessions(result.userId);
+    } catch (sessionError) {
+      console.error(
+        "Failed to revoke active user sessions after password reset:",
+        sessionError.message
+      );
+      throw createError(
+        "Password has been reset, but revoking existing sessions encountered an error.",
+        500
+      );
+    }
   }
 
   return {
