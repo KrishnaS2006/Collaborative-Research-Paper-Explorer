@@ -65,7 +65,7 @@ export const authenticateToken = (req, res, next) => {
   }
 
   // FR-04: Server-side token invalidation and 30-minute inactivity checking
-  const sessionCheck = validateSessionSync(token);
+  const sessionCheck = validateSessionSync(token, decoded);
   if (!sessionCheck.valid) {
     if (typeof res.clearCookie === "function") {
       res.clearCookie("token", {
