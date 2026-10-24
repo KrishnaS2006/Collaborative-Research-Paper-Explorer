@@ -2,6 +2,9 @@
 // Standard test environment initialization.
 // Ensures mandatory environment variables are populated before configuration modules load.
 
+import dotenv from "dotenv";
+dotenv.config();
+
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   process.env.JWT_SECRET = "super_secure_test_jwt_secret_with_32_characters_12345";
 }
