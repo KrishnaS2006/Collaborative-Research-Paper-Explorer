@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import PaperUpload from '../components/PaperUpload';
+import PaperList from '../components/PaperList';
 
 export default function Dashboard() {
   const { user, logout, isAdmin, isResearcher, hasPermission } = useAuth();
@@ -9,6 +11,9 @@ export default function Dashboard() {
 
   const [testActionStatus, setTestActionStatus] = useState(null);
   const [testLoading, setTestLoading] = useState(false);
+  const [paperRefresh, setPaperRefresh] = useState(0);
+
+  const handlePaperAdded = () => setPaperRefresh((n) => n + 1);
 
   const handleLogout = async () => {
     await logout();
@@ -306,6 +311,14 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Research Paper Upload & Import (only for authorized roles) */}
+        {hasPermission('papers:upload') && (
+          <PaperUpload onPaperAdded={handlePaperAdded} />
+        )}
+
+        {/* Research Paper Listing */}
+        <PaperList refreshTrigger={paperRefresh} />
       </div>
     </div>
   );
