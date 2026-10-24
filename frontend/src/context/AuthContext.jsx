@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [showIdleWarning, setShowIdleWarning] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(120);
 
-  const lastActivityRef = useRef(Date.now());
+  const lastActivityRef = useRef(0);
   const warningTimerRef = useRef(null);
 
   // Heartbeat to keep session alive and update activity timestamp
@@ -89,7 +89,6 @@ export const AuthProvider = ({ children }) => {
   // FR-04: Client-side idle inactivity tracking
   useEffect(() => {
     if (!user) {
-      setShowIdleWarning(false);
       return;
     }
 
@@ -147,9 +146,10 @@ export const AuthProvider = ({ children }) => {
       }
     }, 5000);
 
+    const timer = warningTimerRef.current;
     return () => {
       clearInterval(intervalId);
-      if (warningTimerRef.current) clearInterval(warningTimerRef.current);
+      if (timer) clearInterval(timer);
       activityEvents.forEach((event) => {
         window.removeEventListener(event, handleUserActivity);
       });
@@ -238,10 +238,18 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  const updateProfile = async (profileData) => {
+    const res = await axios.put('/api/auth/profile', profileData, {
+      withCredentials: true,
+    });
+    setUser(res.data.user);
+    return res.data;
+  };
+
   // RBAC & Permission Helper Functions
   const normalizeClientRole = (role) => {
     if (!role || typeof role !== 'string') return null;
-    const clean = role.trim().toUpperCase().replace(/[\s\-]+/g, '_');
+    const clean = role.trim().toUpperCase().replace(/[\s-]+/g, '_');
     if (clean === 'SYSTEM_ADMIN' || clean === 'SYSTEMADMIN' || clean === 'ADMIN') return 'SYSTEM_ADMIN';
     if (clean === 'RESEARCHER') return 'RESEARCHER';
     if (clean === 'STUDENT') return 'STUDENT';
@@ -289,6 +297,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         forgotPassword,
         resetPassword,
+        updateProfile,
         heartbeat,
         hasRole,
         hasPermission,

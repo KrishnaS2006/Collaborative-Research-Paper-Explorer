@@ -1,16 +1,21 @@
-
-
-
 import { findUserById } from "../repositories/auth.repository.js";
+import {
+  ROLES,
+  normalizeRole,
+  isRoleMatch,
+  hasPermission,
+} from "../utils/roles.js";
 
-const VALID_ACCESS_ROLES = [
-  "SYSTEM_ADMIN",
-  "LAB_ANNOTATOR",
-  "READ_ONLY_VIEWER",
+const VALID_ROLES = [
+  ROLES.SYSTEM_ADMIN,
+  ROLES.RESEARCHER,
+  ROLES.STUDENT,
 ];
 
 export const createAuthorizeRoles = (findUser = findUserById) => {
   return (...allowedRoles) => {
+    const flattened = allowedRoles.flat();
+
     return async (req, res, next) => {
       if (!req.user) {
         return res.status(401).json({
@@ -27,18 +32,20 @@ export const createAuthorizeRoles = (findUser = findUserById) => {
           });
         }
 
-        const accessRole = user.access_role;
+        const normalizedRole = normalizeRole(user.role);
 
-        if (!VALID_ACCESS_ROLES.includes(accessRole)) {
+        if (!normalizedRole || !VALID_ROLES.includes(normalizedRole)) {
           return res.status(403).json({
-            error: "Access denied. Invalid or missing access role.",
+            error: "Access denied. Invalid or missing user role.",
           });
         }
 
-        req.user.access_role = accessRole;
-        req.user.role = user.role;
+        // Current database role overrides any stale token role
+        req.user.role = normalizedRole;
 
-        if (!allowedRoles.includes(accessRole)) {
+        const isAllowed = isRoleMatch(normalizedRole, flattened);
+
+        if (!isAllowed) {
           return res.status(403).json({
             error: "Forbidden. You do not have permission to perform this action.",
           });
@@ -59,13 +66,6 @@ export const createAuthorizeRoles = (findUser = findUserById) => {
 // Production middleware uses the real repository function.
 export const authorizeRoles = createAuthorizeRoles();
 
-import {
-  ROLES,
-  normalizeRole,
-  isRoleMatch,
-  hasPermission,
-} from "../utils/roles.js";
-
 /**
  * Role-Based Access Control (RBAC) authorization middleware.
  */
@@ -83,7 +83,7 @@ export const authorize = (...allowedRoles) => {
     const userRole = req.user.role;
     const normalizedUser = normalizeRole(userRole);
 
-    if (!normalizedUser) {
+    if (!normalizedUser || !VALID_ROLES.includes(normalizedUser)) {
       return res.status(403).json({
         error: "Forbidden: User has invalid or unassigned role.",
         code: "INVALID_ROLE",

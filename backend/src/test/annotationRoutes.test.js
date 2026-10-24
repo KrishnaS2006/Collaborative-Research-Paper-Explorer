@@ -1,5 +1,3 @@
-
-
 import test from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
@@ -19,7 +17,7 @@ const TEST_SECRET =
 
 const originalQuery = pool.query;
 
-let activeRole = "READ_ONLY_VIEWER";
+let activeRole = "STUDENT";
 let queryHandler = async () => ({ rows: [] });
 
 function createTestApp() {
@@ -59,8 +57,7 @@ function mockDatabase(role, handler = async () => ({ rows: [] })) {
             id: TEST_USER_ID,
             email: "test@example.com",
             full_name: "Test User",
-            role: "STUDENT",
-            access_role: activeRole,
+            role: activeRole,
           }],
         };
       }
@@ -72,7 +69,6 @@ function mockDatabase(role, handler = async () => ({ rows: [] })) {
             email: "other@example.com",
             full_name: "Other User",
             role: "RESEARCHER",
-            access_role: "LAB_ANNOTATOR",
           }],
         };
       }
@@ -96,8 +92,8 @@ test("Annotation API: unauthenticated request returns 401", async () => {
   assert.equal(response.status, 401);
 });
 
-test("Annotation API: read-only viewer can read annotations", async () => {
-  mockDatabase("READ_ONLY_VIEWER");
+test("Annotation API: student can read annotations", async () => {
+  mockDatabase("STUDENT");
 
   const response = await request(createTestApp())
     .get("/api/annotations")
@@ -107,8 +103,8 @@ test("Annotation API: read-only viewer can read annotations", async () => {
   assert.deepEqual(response.body.annotations, []);
 });
 
-test("Annotation API: annotator can read annotations", async () => {
-  mockDatabase("LAB_ANNOTATOR");
+test("Annotation API: researcher can read annotations", async () => {
+  mockDatabase("RESEARCHER");
 
   const response = await request(createTestApp())
     .get("/api/annotations")
@@ -128,7 +124,7 @@ test("Annotation API: system admin can read annotations", async () => {
 });
 
 test("Annotation API: invalid paper UUID returns 400", async () => {
-  mockDatabase("READ_ONLY_VIEWER");
+  mockDatabase("STUDENT");
 
   const response = await request(createTestApp())
     .get("/api/annotations?paper_id=invalid")
@@ -137,8 +133,8 @@ test("Annotation API: invalid paper UUID returns 400", async () => {
   assert.equal(response.status, 400);
 });
 
-test("Annotation API: read-only viewer cannot create annotations", async () => {
-  mockDatabase("READ_ONLY_VIEWER");
+test("Annotation API: student cannot create annotations", async () => {
+  mockDatabase("STUDENT");
 
   const response = await request(createTestApp())
     .post("/api/annotations")
@@ -152,8 +148,8 @@ test("Annotation API: read-only viewer cannot create annotations", async () => {
   assert.equal(response.status, 403);
 });
 
-test("Annotation API: annotator can create an annotation", async () => {
-  mockDatabase("LAB_ANNOTATOR", async (sql) => {
+test("Annotation API: researcher can create an annotation", async () => {
+  mockDatabase("RESEARCHER", async (sql) => {
     if (sql.includes("INSERT INTO annotations")) {
       return {
         rows: [{
@@ -183,7 +179,7 @@ test("Annotation API: annotator can create an annotation", async () => {
 });
 
 test("Annotation API: invalid annotation content returns 400", async () => {
-  mockDatabase("LAB_ANNOTATOR");
+  mockDatabase("RESEARCHER");
 
   const response = await request(createTestApp())
     .post("/api/annotations")
@@ -197,8 +193,8 @@ test("Annotation API: invalid annotation content returns 400", async () => {
   assert.equal(response.status, 400);
 });
 
-test("Annotation API: annotator cannot delete annotations", async () => {
-  mockDatabase("LAB_ANNOTATOR");
+test("Annotation API: researcher cannot delete annotations", async () => {
+  mockDatabase("RESEARCHER");
 
   const response = await request(createTestApp())
     .delete(`/api/annotations/${ANNOTATION_ID}`)
@@ -234,8 +230,8 @@ test("Annotation API: administrator can delete an existing annotation", async ()
   assert.equal(response.body.id, ANNOTATION_ID);
 });
 
-test("Annotation API: annotator cannot edit another user's annotation", async () => {
-  mockDatabase("LAB_ANNOTATOR", async (sql) => {
+test("Annotation API: researcher cannot edit another user's annotation", async () => {
+  mockDatabase("RESEARCHER", async (sql) => {
     if (sql.includes("SELECT id, created_by FROM annotations")) {
       return {
         rows: [{
@@ -256,9 +252,8 @@ test("Annotation API: annotator cannot edit another user's annotation", async ()
   assert.equal(response.status, 403);
 });
 
-
-test("Annotation API: annotator can edit their own annotation", async () => {
-  mockDatabase("LAB_ANNOTATOR", async (sql) => {
+test("Annotation API: researcher can edit their own annotation", async () => {
+  mockDatabase("RESEARCHER", async (sql) => {
     if (sql.includes("SELECT id, created_by FROM annotations")) {
       return {
         rows: [{
@@ -329,7 +324,6 @@ test("Annotation API: system admin can edit another user's annotation", async ()
     "Admin updated annotation"
   );
 });
-
 
 // Restore the original database method after all tests in this file finish.
 test.after(() => {

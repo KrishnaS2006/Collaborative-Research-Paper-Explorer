@@ -4,6 +4,7 @@ import {
   getCurrentUserById,
   requestPasswordReset,
   resetUserPassword,
+  updateUserProfileService,
   verifyEmail as verifyEmailService,
   resendVerificationEmail as resendVerificationService,
 } from "../services/auth.service.js";
@@ -146,6 +147,24 @@ export const getCurrentUser = async (req, res, next) => {
     }
 
     return res.status(200).json({ user });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateProfile = async (req, res, next) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const updatedUser = await updateUserProfileService({
+      userId,
+      currentUserRole: req.user.role,
+      payload: req.body ?? {},
+    });
+
+    return res.status(200).json({
+      message: "Profile updated successfully.",
+      user: updatedUser,
+    });
   } catch (error) {
     return next(error);
   }
@@ -342,6 +361,7 @@ export default {
   login,
   logout,
   getCurrentUser,
+  updateProfile,
   forgotPassword,
   resetPassword,
   getSsoConfig,

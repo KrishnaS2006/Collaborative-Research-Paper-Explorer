@@ -3,21 +3,22 @@ import express from "express";
 import pool from "../config/database.js";
 import { authenticateToken } from "../middleware/authenticate.js";
 import { authorizeRoles } from "../middleware/authorize.js";
+import { ROLES } from "../utils/roles.js";
 
 const router = express.Router();
 
 const ALL_ROLES = [
-  "SYSTEM_ADMIN",
-  "LAB_ANNOTATOR",
-  "READ_ONLY_VIEWER",
+  ROLES.SYSTEM_ADMIN,
+  ROLES.RESEARCHER,
+  ROLES.STUDENT,
 ];
 
 const EDIT_ROLES = [
-  "SYSTEM_ADMIN",
-  "LAB_ANNOTATOR",
+  ROLES.SYSTEM_ADMIN,
+  ROLES.RESEARCHER,
 ];
 
-const ADMIN_ROLE = ["SYSTEM_ADMIN"];
+const ADMIN_ROLE = [ROLES.SYSTEM_ADMIN];
 
 const isValidUUID = (value) =>
   typeof value === "string" &&
@@ -117,7 +118,7 @@ router.get(
   }
 );
 
-// System admins and lab annotators can create annotations.
+// System admins and researchers can create annotations.
 router.post(
   "/",
   authenticateToken,
@@ -240,7 +241,7 @@ router.patch(
       const annotation = existing.rows[0];
 
       if (
-        req.user.access_role !== "SYSTEM_ADMIN" &&
+        req.user.role !== ROLES.SYSTEM_ADMIN &&
         annotation.created_by !== req.user.id
       ) {
         return res.status(403).json({

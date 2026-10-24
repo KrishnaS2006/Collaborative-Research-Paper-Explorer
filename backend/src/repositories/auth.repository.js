@@ -24,7 +24,7 @@ export const findUserByEmail = async (email) => {
 
   const result = await pool.query(
     `SELECT id, email, password_hash, full_name, role,
-       access_role, affiliation, research_interests, email_verified
+       affiliation, research_interests, email_verified
      FROM users
      WHERE LOWER(email) = LOWER($1)`,
     [email]
@@ -70,7 +70,7 @@ export const createUser = async ({
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id, email, full_name, role,
-          access_role, affiliation, research_interests, email_verified`,
+          affiliation, research_interests, email_verified`,
     [
       email,
       passwordHash,
@@ -87,7 +87,7 @@ export const createUser = async ({
 export const findUserById = async (id) => {
   const result = await pool.query(
     `SELECT id, email, full_name, role,
-       access_role, affiliation, research_interests, email_verified
+       affiliation, research_interests, email_verified
      FROM users
      WHERE id = $1`,
     [id]
@@ -359,7 +359,7 @@ export const consumeEmailVerificationToken = async (tokenHash) => {
        SET email_verified = TRUE,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
-       RETURNING id, email, full_name, role, access_role, affiliation, research_interests, email_verified`,
+       RETURNING id, email, full_name, role, affiliation, research_interests, email_verified`,
       [tokenRecord.user_id]
     );
 
@@ -452,7 +452,7 @@ export const createSsoUserWithIdentity = async ({
        )
        VALUES ($1, $2, $3, $4, $5, $6, TRUE)
        RETURNING id, email, full_name, role,
-          access_role, affiliation, research_interests, email_verified`,
+          affiliation, research_interests, email_verified`,
       [
         email,
         passwordHash,
@@ -577,6 +577,65 @@ export const updateUserRole = async (userId, role) => {
      RETURNING id, email, full_name, role, affiliation, research_interests, email_verified, updated_at`,
     [role, userId]
   );
+  return result.rows[0] ?? null;
+};
+
+let testUpdateUserProfileHandler = null;
+
+export const _setUpdateUserProfileForTesting = (fn) => {
+  testUpdateUserProfileHandler = fn;
+};
+
+export const _resetUpdateUserProfileForTesting = () => {
+  testUpdateUserProfileHandler = null;
+};
+
+export const updateUserProfile = async ({
+  userId,
+  fullName,
+  affiliation,
+  researchInterests,
+}) => {
+  if (testUpdateUserProfileHandler) {
+    return testUpdateUserProfileHandler({
+      userId,
+      fullName,
+      affiliation,
+      researchInterests,
+    });
+  }
+
+  const fields = [];
+  const params = [];
+
+  if (fullName !== undefined) {
+    params.push(fullName);
+    fields.push(`full_name = ${params.length}`);
+  }
+  if (affiliation !== undefined) {
+    params.push(affiliation);
+    fields.push(`affiliation = ${params.length}`);
+  }
+  if (researchInterests !== undefined) {
+    params.push(researchInterests);
+    fields.push(`research_interests = ${params.length}`);
+  }
+
+  if (fields.length === 0) {
+    return findUserById(userId);
+  }
+
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  params.push(userId);
+
+  const query = `
+    UPDATE users
+    SET ${fields.join(', ')}
+    WHERE id = ${params.length}
+    RETURNING id, email, full_name, role, affiliation, research_interests, email_verified, updated_at
+  `;
+
+  const result = await pool.query(query, params);
   return result.rows[0] ?? null;
 };
 

@@ -7,6 +7,7 @@ import {
   login,
   logout,
   getCurrentUser,
+  updateProfile,
   forgotPassword,
   resetPassword,
   getSsoConfig,
@@ -57,6 +58,10 @@ router.post("/logout", logout);
 
 // Get current authenticated user
 router.get("/me", authenticateToken, getCurrentUser);
+
+// Update user profile (FR-05: prevents users from modifying their own roles)
+router.put("/profile", authenticateToken, updateProfile);
+router.patch("/profile", authenticateToken, updateProfile);
 
 // Request a password reset email
 router.post(

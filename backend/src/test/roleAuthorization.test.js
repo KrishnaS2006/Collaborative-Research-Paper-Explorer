@@ -20,6 +20,10 @@ import {
   hasPermission,
   getPermissionsForRole,
 } from "../utils/roles.js";
+import {
+  _setUpdateUserProfileForTesting,
+  _resetUpdateUserProfileForTesting,
+} from "../repositories/auth.repository.js";
 
 describe("Role-Based Authorization & Permission Enforcement Test Suite", () => {
   const TEST_SECRET =
@@ -90,6 +94,10 @@ describe("Role-Based Authorization & Permission Enforcement Test Suite", () => {
     it("should return null for invalid roles", () => {
       assert.equal(normalizeRole("SUPERUSER"), null);
       assert.equal(normalizeRole("GUEST"), null);
+      assert.equal(normalizeRole("LAB_ANNOTATOR"), null);
+      assert.equal(normalizeRole("READ_ONLY_VIEWER"), null);
+      assert.equal(normalizeRole("Lab Annotator"), null);
+      assert.equal(normalizeRole("Read-Only Viewer"), null);
       assert.equal(normalizeRole(""), null);
       assert.equal(normalizeRole(null), null);
     });
@@ -347,6 +355,123 @@ describe("Role-Based Authorization & Permission Enforcement Test Suite", () => {
       const body = await res.json();
       assert.equal(body.message, "User role updated successfully.");
       assert.equal(body.user.role, "SYSTEM_ADMIN");
+    });
+  });
+
+  /* ===================================================================
+   * 6. PROFILE UPDATES & PREVENTION OF SELF-ROLE-ESCALATION (FR-05)
+   * =================================================================== */
+  describe("Profile Updates & Self-Role-Escalation Prevention", () => {
+    it("should allow authenticated user to update their own profile fields", async () => {
+      _setUpdateUserProfileForTesting(async ({ userId, fullName, affiliation, researchInterests }) => ({
+        id: userId,
+        email: "student@example.edu",
+        full_name: fullName,
+        role: "STUDENT",
+        affiliation,
+        research_interests: researchInterests,
+      }));
+
+      const studentToken = createToken("STUDENT", "student-user-1");
+      const res = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${studentToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: "Jane Student Updated",
+          affiliation: "Faculty of Science",
+          research_interests: ["Quantum Computing"],
+        }),
+      });
+
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.message, "Profile updated successfully.");
+      assert.equal(body.user.full_name, "Jane Student Updated");
+      assert.equal(body.user.affiliation, "Faculty of Science");
+      _resetUpdateUserProfileForTesting();
+    });
+
+    it("should reject profile update attempt to change or escalate user role (403)", async () => {
+      const studentToken = createToken("STUDENT", "student-user-1");
+      const res = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${studentToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: "Jane Student",
+          role: "SYSTEM_ADMIN",
+        }),
+      });
+
+      assert.equal(res.status, 403);
+      const body = await res.json();
+      assert.match(body.error, /Changing user roles through profile update is forbidden/);
+    });
+
+    it("should reject unauthenticated profile update requests (401)", async () => {
+      const res = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: "Unauthenticated Update",
+        }),
+      });
+
+      assert.equal(res.status, 401);
+    });
+
+    it("should reject profile update attempt providing access_role (403)", async () => {
+      const studentToken = createToken("STUDENT", "student-user-1");
+      const res = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${studentToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: "Jane Student",
+          access_role: "LAB_ANNOTATOR",
+        }),
+      });
+
+      assert.equal(res.status, 403);
+      const body = await res.json();
+      assert.match(body.error, /Changing user roles through profile update is forbidden/);
+    });
+
+    it("should reject admin role change to obsolete role LAB_ANNOTATOR or READ_ONLY_VIEWER (400)", async () => {
+      const adminToken = createToken("SYSTEM_ADMIN", "admin-user-1");
+
+      const res1 = await fetch(`${baseUrl}/api/auth/users/target-user-id/role`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role: "LAB_ANNOTATOR" }),
+      });
+      assert.equal(res1.status, 400);
+      const body1 = await res1.json();
+      assert.match(body1.error, /Invalid role specified/);
+
+      const res2 = await fetch(`${baseUrl}/api/auth/users/target-user-id/role`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role: "READ_ONLY_VIEWER" }),
+      });
+      assert.equal(res2.status, 400);
+      const body2 = await res2.json();
+      assert.match(body2.error, /Invalid role specified/);
     });
   });
 });
