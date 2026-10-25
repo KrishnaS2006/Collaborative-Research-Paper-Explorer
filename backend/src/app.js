@@ -1,9 +1,14 @@
-
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-
+import annotationRoutes from "./routes/annotation.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import paperRoutes from "./routes/paper.routes.js";
+import tagRoutes from "./routes/tag.routes.js";
+import collaboratorRoutes from "./routes/collaborator.routes.js";
+import discussionRoutes from "./routes/discussion.routes.js";
+import invitationRoutes from "./routes/invitation.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
@@ -28,6 +33,13 @@ app.get("/health", (req, res) => {
 
 // API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/papers/:paperId/collaborators", collaboratorRoutes);
+app.use("/api/papers/:paperId/discussions", discussionRoutes);
+app.use("/api/papers", paperRoutes);
+app.use("/api/annotations", annotationRoutes);
+app.use("/api/tags", tagRoutes);
+app.use("/api/invitations", invitationRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

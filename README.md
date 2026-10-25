@@ -1,348 +1,332 @@
 # Collaborative Research Paper Explorer
 
-A full-stack web application designed to help users explore research papers and support collaborative research workflows.
+A full-stack web application that enables researchers, students, and laboratory members to discover, organize, and annotate research papers collaboratively. The platform provides secure authentication, role-based access control, session management, and PostgreSQL-backed data persistence.
 
-## 📌 Project Overview
+## 📌 Overview
 
-**Collaborative Research Paper Explorer** is being developed with a React frontend and a Node.js/Express backend. The backend uses PostgreSQL for data storage and JWT-based authentication.
+The **Collaborative Research Paper Explorer** simplifies academic research by providing a centralized platform for managing research papers and collaborating with other users.
 
-This repository is under active development. Features and setup instructions may evolve as the project grows.
+The application consists of a React-based frontend, a Node.js and Express backend, and a PostgreSQL database. It supports user authentication, email verification, password recovery, institutional Single Sign-On (SSO), and collaborative paper annotation.
+
+## ✨ Features
+
+- **User Authentication:** Secure registration, login, and logout.
+- **Email Verification:** Verify registered email addresses and resend verification emails.
+- **Password Recovery:** Reset forgotten passwords securely.
+- **JWT Authentication:** Token-based authentication with cookie handling.
+- **Role-Based Access Control (RBAC):** Restrict access according to user permissions.
+- **Institutional SSO:** Support for OAuth-based institutional sign-in.
+- **Session Management:** Track sessions, handle expiration, and revoke sessions.
+- **Research Paper Management:** Retrieve and browse paper metadata through API endpoints.
+- **Collaborative Annotations:** Create, update, retrieve, and delete annotations.
+- **PostgreSQL Integration:** Store users, papers, collections, sessions, and related records.
+- **Testing:** Automated backend tests for authentication, authorization, validation, and other core functionality.
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- React
-- Vite
-- JavaScript
-- Tailwind CSS
-- React Router (where configured)
+| Component | Technologies |
+|---|---|
+| Frontend | React, Vite, React Router, Tailwind CSS |
+| Backend | Node.js, Express.js |
+| Database | PostgreSQL |
+| Authentication | JWT, bcryptjs, secure cookies |
+| Email Services | Nodemailer |
+| Testing | Node.js Test Runner, Supertest |
+| Version Control | Git, GitHub |
 
-### Backend
-- Node.js
-- Express.js
-- PostgreSQL
-- `pg` — PostgreSQL client
-- JWT (`jsonwebtoken`) — authentication tokens
-- `bcryptjs` — password hashing
-- `cookie-parser` — cookie handling
-- `cors` — cross-origin request configuration
-- `dotenv` — environment variables
-- Nodemailer — email delivery for password-reset workflows
-
-### Development and Deployment
-- Git and GitHub
-- Docker and Docker Compose — containerization setup
-- CI/CD — planned automation for testing and deployment
-
-## 📂 Project Structure
+## 📁 Project Structure
 
 ```text
 Collaborative-Research-Paper-Explorer/
 ├── backend/
 │   ├── src/
 │   │   ├── config/
-│   │   │   └── env.js
-│   │   ├── repositories/
-│   │   ├── services/
 │   │   ├── controllers/
-│   │   ├── routes/
 │   │   ├── middleware/
+│   │   ├── modules/
+│   │   ├── repositories/
+│   │   ├── routes/
+│   │   ├── scripts/
+│   │   ├── services/
+│   │   ├── test/
 │   │   ├── utils/
 │   │   ├── app.js
 │   │   └── server.js
-│   ├── test/
-│   ├── .env
 │   ├── package.json
 │   └── package-lock.json
-│
 ├── frontend/
 │   ├── src/
-│   ├── public/
+│   ├── index.html
 │   ├── package.json
+│   ├── vite.config.js
 │   └── package-lock.json
-│
-├── compose.yaml
-├── .gitignore
-└── README.md
+├── database/
+│   ├── schema.sql
+│   └── *.sql
+├── README.md
+└── .gitignore
 ```
-
-*Note: The directory tree represents the intended structure. Adjust it to match the files currently present in your repository.*
-
-## ✨ Backend Features and Work in Progress
-
-- Express application with centralized middleware and error handling.
-- PostgreSQL database connectivity.
-- User registration and login workflows.
-- Password hashing using bcrypt.
-- JWT-based authentication.
-- Cookie-based authentication support.
-- Password-reset token generation and expiration.
-- Password-reset email integration using Nodemailer.
-- Environment-based configuration.
-- Automated tests using Node.js's built-in test runner.
-- Docker-based development setup.
 
 ## ⚙️ Prerequisites
 
-Install the following tools before starting:
+Make sure the following tools are installed:
 
-- [Node.js](https://nodejs.org/) — Node.js 22 is the current project development version.
-- npm — included with Node.js.
+- [Node.js](https://nodejs.org/) (version 18 or newer)
+- npm
+- [PostgreSQL](https://www.postgresql.org/) (version 15 or compatible)
 - [Git](https://git-scm.com/)
-- PostgreSQL database or a compatible hosted PostgreSQL database, such as Neon.
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — required only for Docker-based development.
 
 ## 🚀 Getting Started
 
-### 1. Clone the repository
+Follow these steps to run the project locally.
+
+### 1. Clone the Repository
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+git clone https://github.com/omp091220-git/Collaborative-Research-Paper-Explorer.git
+
 cd Collaborative-Research-Paper-Explorer
 ```
 
-Replace the placeholder with the actual GitHub repository URL.
+### 2. Set Up the Database
 
-### 2. Install backend dependencies
+Create a PostgreSQL database:
+
+```sql
+CREATE DATABASE research_explorer;
+```
+
+Import the database schema from the project root:
+
+```bash
+psql -U postgres -d research_explorer -f database/schema.sql
+```
+
+Enter your PostgreSQL password when prompted.
+
+**Note:** If the repository contains additional migration files required by your version of the project, apply them in the appropriate order.
+
+### 3. Configure Environment Variables
+
+Create a `.env` file inside the `backend/` directory.
+
+```env
+PORT=5000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+JWT_SECRET=replace_with_a_long_random_secret
+
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/research_explorer
+```
+
+Replace `your_password` with your PostgreSQL password and configure any additional variables required by the backend.
+
+If email verification, password recovery, or SSO is enabled, configure the required SMTP and OAuth credentials as well.
+
+**Security:** Never commit your `.env` file or expose production credentials in the repository.
+
+### 4. Install Backend Dependencies
+
+Open a terminal at the project root:
 
 ```bash
 cd backend
 npm install
 ```
 
-### 3. Configure environment variables
+### 5. Start the Backend Server
 
-Create a `backend/.env` file:
-
-```dotenv
-NODE_ENV=development
-PORT=5000
-
-DATABASE_URL=YOUR_POSTGRESQL_CONNECTION_STRING
-JWT_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARACTERS_LONG
-
-FRONTEND_URL=http://localhost:5173
-
-EMAIL_SERVICE_MODE=console
-
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
-```
-
-Replace the database connection string and JWT secret with your own values.
-
-**Security guidelines:**
-- Never commit `.env` files to GitHub.
-- Never share database passwords, SMTP credentials, or JWT secrets publicly.
-- Use a strong, randomly generated JWT secret.
-- For real password-reset email delivery, configure SMTP credentials and the email settings supported by the implementation.
-- `EMAIL_SERVICE_MODE=console` should be used only if the current email service supports console mode.
-
-### 4. Start the backend
-
-From the `backend` directory:
+For development:
 
 ```bash
 npm run dev
 ```
 
-The backend is configured to use port `5000` by default.
+Alternatively, use:
 
-Check the health endpoint:
-
-```text
-http://localhost:5000/health
+```bash
+npm start
 ```
 
-### 5. Start the frontend
+The backend will run on the configured port, typically:
 
-Open a second terminal:
+`http://localhost:5000`
+
+### 6. Install Frontend Dependencies
+
+Open a second terminal at the project root:
 
 ```bash
 cd frontend
 npm install
+```
+
+### 7. Start the Frontend
+
+```bash
 npm run dev
 ```
 
-Vite normally starts the frontend at:
+Open the local URL displayed by Vite, typically:
 
-```text
-http://localhost:5173
-```
+`http://localhost:5173`
 
-If the frontend uses the Vite development proxy, API requests should use relative paths such as `/api/auth/login`. Confirm that the proxy target matches how the backend is running.
+Keep both the frontend and backend terminals running while using the application.
 
-## 🧪 Running Tests
+## 🔌 API Overview
 
-From the backend directory:
+The backend exposes REST API endpoints for authentication, research papers, and annotations.
+
+### Authentication — `/api/auth`
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/register` | Register a new user |
+| POST | `/login` | Authenticate a user |
+| POST | `/logout` | Log out and invalidate the applicable session |
+| GET | `/me` | Retrieve the current user's information |
+| POST | `/verify-email` | Verify an email address |
+| POST | `/resend-verification` | Resend an email verification link |
+| POST | `/forgot-password` | Initiate password recovery |
+| POST | `/reset-password` | Reset a password |
+| GET | `/sso/config` | Retrieve SSO configuration |
+| GET | `/sso/login` | Initiate SSO authentication |
+| GET | `/sso/callback` | Handle the SSO callback |
+
+### Research Papers — `/api/papers`
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/` | Retrieve available research papers |
+
+### Annotations — `/api/annotations`
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/` | Retrieve annotations |
+| POST | `/` | Create an annotation |
+| PATCH | `/:id` | Update an annotation |
+| DELETE | `/:id` | Delete an annotation |
+
+**Note:** The paths above are relative to their respective API route groups. Actual request URLs may include the `/api` prefix. Authentication, permissions, and request validation may be required for protected endpoints.
+
+## 🔐 Authentication and Authorization
+
+The application incorporates authentication and authorization mechanisms designed to protect user accounts and research resources.
+
+Key concepts include:
+
+- JWT-based authentication.
+- Secure cookie handling.
+- Password hashing with bcryptjs.
+- Role-based permission checks.
+- Session expiration and revocation.
+- Email verification and password recovery.
+- OAuth-based institutional SSO.
+
+Roles and permissions are managed through the application's database schema and backend authorization logic. Use the role identifiers defined in the current schema and configuration.
+
+## 🗄️ Database Design
+
+The database supports the application's authentication and research collaboration workflows.
+
+Core data models include:
+
+- `users` — User accounts and profile information.
+- `papers` — Research paper metadata.
+- `paper_summaries` — Paper summaries.
+- `collections` — User-organized paper collections.
+- `collection_members` — Collection membership.
+- `collection_papers` — Papers associated with collections.
+- `password_reset_tokens` — Password recovery tokens.
+- `email_verification_tokens` — Email verification tokens.
+- `sso_identities` — External identity provider associations.
+- `user_sessions` — User session records.
+
+Additional tables may support roles, permissions, annotations, and other application features, depending on the applied schema and migrations.
+
+## 🧪 Testing
+
+The backend contains automated tests for important application workflows.
+
+Run the backend test suite:
 
 ```bash
+cd backend
 npm test
 ```
 
-The backend test script uses Node.js's built-in test runner. Ensure your test files are located under `backend/test/` and use supported test file naming.
+Tests may cover:
 
-## 🐳 Docker Development
+- Authentication routes.
+- Middleware behavior.
+- Authorization and role checks.
+- Session expiration.
+- SSO workflows.
+- Request validation.
+- Annotation operations.
 
-Docker allows the frontend and backend to run in separate containers, making it easier for team members to use a consistent development environment.
+Ensure the required environment variables and test database configuration are set before running tests.
 
-The intended architecture is:
+## 🤝 Contributing
 
-```text
-Browser
-   |
-   v
-Frontend — Vite :5173
-   |
-   | /api requests through Vite proxy
-   v
-Backend — Express :5000
-   |
-   v
-PostgreSQL / Neon
-```
+Contributions are welcome. To keep development organized, work on a separate feature branch instead of pushing directly to `main`.
 
-### Start the containers
+### Recommended Workflow
 
-Once the Dockerfiles and root `compose.yaml` are configured:
+**1. Get the latest changes**
 
 ```bash
-docker compose up --build
+git checkout main
+git pull origin main
 ```
 
-Run the services in the background:
+**2. Create a feature branch**
 
 ```bash
-docker compose up --build -d
+git checkout -b feature/my-change
 ```
 
-View logs:
+**3. Make changes and test your code**
 
-```bash
-docker compose logs -f
-```
+Run the relevant tests before committing.
 
-View running containers:
-
-```bash
-docker compose ps
-```
-
-Stop the containers:
-
-```bash
-docker compose down
-```
-
-The frontend Vite proxy must target the backend's Docker Compose service name when Vite runs inside Docker. For example, if the service is named `backend`, the target is `http://backend:5000`.
-
-The backend must listen on `0.0.0.0` inside its container so Docker can route traffic to it.
-
-**Important:** Docker commands require the Docker configuration files to be created and verified first. The commands above describe the intended workflow.
-
-## 🔐 Authentication and Password Reset
-
-The backend's authentication workflow is designed around:
-
-1. Registering a user.
-2. Hashing passwords before storage.
-3. Logging in and issuing a JWT.
-4. Supporting authentication through cookies.
-5. Requesting a password reset.
-6. Generating a time-limited reset token.
-7. Validating the token before updating the password.
-8. Sending password-reset emails through the configured email service.
-
-Reset tokens should be handled securely and must expire. Do not log or expose production credentials or sensitive tokens.
-
-## 🌿 Git Workflow for Team Collaboration
-
-For collaborative development, use feature branches rather than committing every change directly to the shared development branch.
-
-### Create a feature branch
-
-```bash
-git switch developer
-git pull origin developer
-git switch -c feature/your-feature-name
-```
-
-### Save your changes
+**4. Commit your changes**
 
 ```bash
 git add .
-git commit -m "feat: describe your change"
-git push -u origin feature/your-feature-name
+git commit -m "Add my feature"
 ```
 
-Open a Pull Request to merge the feature branch into `developer` after reviewing the changes and running the relevant tests.
-
-### Useful Git commands
+**5. Push your branch**
 
 ```bash
-git status
-git branch
-git branch -a
-git pull origin developer
-git log --oneline --graph --all
+git push -u origin feature/my-change
 ```
 
-Before merging remote changes, check `git status` and resolve any existing merge or stash conflicts carefully. Do not discard stashes or reset changes unless you are certain they are no longer needed.
+**6. Open a Pull Request**
 
-## 🔄 CI/CD Roadmap
+Create a pull request on GitHub, review the changes, and merge into `main` only after approval.
 
-The planned CI/CD workflow can automate quality checks whenever a developer pushes code or opens a Pull Request.
+## 🔒 Security Best Practices
 
-Potential pipeline stages:
-
-1. Check out the repository.
-2. Set up the required Node.js version.
-3. Install dependencies using the lockfiles.
-4. Run backend tests.
-5. Build the frontend.
-6. Build Docker images.
-7. Deploy after the required checks pass.
-
-CI/CD configuration should be added after confirming that the current tests, frontend build, and Docker setup work correctly.
-
-## 🔒 Security
-
-- Keep `.env` files out of version control.
-- Store production secrets in the deployment platform's secret manager.
-- Validate incoming request data.
-- Hash passwords instead of storing plaintext passwords.
-- Configure CORS and cookie settings for the intended environment.
-- Use HTTPS in production.
-- Add appropriate rate limits to authentication and password-reset endpoints.
-- Avoid returning internal errors or sensitive database details to clients.
-
-## 🗺️ Development Roadmap
-
-- [x] Initial backend package configuration
-- [x] Environment configuration foundation
-- [x] Express application and server structure
-- [x] PostgreSQL integration foundation
-- [x] Authentication and password-reset service work
-- [ ] Verify all authentication and password-reset tests
-- [ ] Complete and verify frontend/backend integration
-- [ ] Finalize Dockerfiles and Docker Compose
-- [ ] Set up automated CI/CD checks
-- [ ] Configure production deployment
-- [ ] Document confirmed API endpoints and usage examples
-
-The checklist should be updated as each item is verified in the repository.
-
-## 👥 Contributing
-
-1. Create a feature branch.
-2. Keep changes focused and avoid committing secrets.
-3. Run the relevant tests before opening a Pull Request.
-4. Describe the change and any configuration requirements.
-5. Request a review before merging into the shared development branch.
+- Keep API keys, database passwords, and JWT secrets in environment variables.
+- Never commit `.env` files or other sensitive credentials.
+- Validate and sanitize incoming requests.
+- Apply authorization checks to protected resources.
+- Configure secure cookie attributes for production.
+- Use HTTPS in production deployments.
+- Keep dependencies updated and review security advisories.
 
 ## 📄 License
 
-The project currently uses the license metadata declared in `backend/package.json`. Add a root-level `LICENSE` file and update this section once the project license has been decided.
+No custom license is specified here. Check the repository's license information before redistributing or using the project beyond its intended scope.
+
+## 👥 Project Goal
+
+The goal of the **Collaborative Research Paper Explorer** is to make academic research workflows more organized, secure, and collaborative by combining research paper management, authentication, access control, and annotation functionality in one platform.
+
+---
+
+**Repository:** [Collaborative Research Paper Explorer](https://github.com/omp091220-git/Collaborative-Research-Paper-Explorer)

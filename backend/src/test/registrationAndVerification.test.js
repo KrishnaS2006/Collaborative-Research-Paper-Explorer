@@ -1,3 +1,4 @@
+import './setup.js';
 import { describe, it, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
@@ -7,6 +8,7 @@ import bcrypt from "bcryptjs";
 
 import authRoutes from "../routes/auth.routes.js";
 import errorHandler from "../middleware/errorHandler.js";
+import { env } from "../config/env.js";
 import {
   resendVerificationRateLimiter,
   loginRateLimiter,
@@ -20,18 +22,30 @@ import {
   isAllowedInstitutionalEmail,
   validateRegisterPayload,
 } from "../utils/validation.js";
+import {
+  _setFindUserByEmailForTesting,
+  _resetFindUserByEmailForTesting,
+  _setCreateUserForTesting,
+  _resetCreateUserForTesting,
+  _setCreateEmailVerificationTokenForTesting,
+  _resetCreateEmailVerificationTokenForTesting,
+  _setConsumeEmailVerificationTokenForTesting,
+  _resetConsumeEmailVerificationTokenForTesting,
+} from "../repositories/auth.repository.js";
 
 describe("FR-01: User Registration & Email Verification Suite", () => {
   let app;
   let server;
   let baseUrl;
   const originalEnv = { ...process.env };
+  const originalAllowedDomains = [...env.allowedEmailDomains];
 
   before(async () => {
     process.env.JWT_SECRET =
       "test-jwt-secret-min-32-chars-long-security-123456";
     process.env.NODE_ENV = "test";
     process.env.ALLOWED_EMAIL_DOMAINS = "dau.ac.in,university.edu";
+    env.allowedEmailDomains = ["dau.ac.in", "university.edu"];
 
     app = express();
     app.use(express.json());
@@ -50,6 +64,7 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
 
   after(async () => {
     process.env = { ...originalEnv };
+    env.allowedEmailDomains = [...originalAllowedDomains];
     if (server) {
       await new Promise((resolve) => server.close(resolve));
     }
@@ -59,6 +74,10 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
     resetTransporterForTesting();
     resendVerificationRateLimiter.reset();
     loginRateLimiter.reset();
+    _resetFindUserByEmailForTesting();
+    _resetCreateUserForTesting();
+    _resetCreateEmailVerificationTokenForTesting();
+    _resetConsumeEmailVerificationTokenForTesting();
   });
 
   describe("Institutional Email Domain Matching Logic", () => {
@@ -241,7 +260,154 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
       assert.match(data.error, /Affiliation is required/);
     });
 
+    it("should successfully register a new user and persist all fields", async () => {
+      let createdUserData = null;
+      _setFindUserByEmailForTesting(async () => null);
+      _setCreateUserForTesting(async (u) => {
+        createdUserData = u;
+        return {
+          id: "new-user-123",
+          email: u.email,
+          full_name: u.fullName,
+          role: u.role,
+          affiliation: u.affiliation,
+          research_interests: u.researchInterests,
+          email_verified: false,
+        };
+      });
+      _setCreateEmailVerificationTokenForTesting(async () => ({ id: "tok-1" }));
+
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: "Dr. Alice Turing",
+          email: "alice@university.edu",
+          password: "SecurePassword123!",
+          role: "RESEARCHER",
+          affiliation: "Dept of CS",
+          research_interests: ["Quantum Computing", "AI"],
+        }),
+      });
+
+      assert.equal(res.status, 201);
+      const data = await res.json();
+      assert.ok(data.user);
+      assert.equal(data.user.email, "alice@university.edu");
+      assert.equal(data.user.full_name, "Dr. Alice Turing");
+      assert.equal(data.user.role, "RESEARCHER");
+      assert.equal(data.user.affiliation, "Dept of CS");
+      assert.deepEqual(data.user.research_interests, ["Quantum Computing", "AI"]);
+
+      // Verify password hashing before DB persistence
+      assert.ok(createdUserData);
+      assert.notEqual(createdUserData.passwordHash, "SecurePassword123!");
+      assert.match(createdUserData.passwordHash, /^\$2[aby]\$\d+\$/);
+      const isMatch = await bcrypt.compare(
+        "SecurePassword123!",
+        createdUserData.passwordHash
+      );
+      assert.equal(isMatch, true);
+    });
+
+    it("should reject duplicate email registration with 409 Conflict", async () => {
+      _setFindUserByEmailForTesting(async (email) => ({
+        id: "existing-user-uuid",
+        email: email.toLowerCase(),
+        full_name: "Existing Person",
+        role: "STUDENT",
+      }));
+
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: "Duplicate User",
+          email: "duplicate@university.edu",
+          password: "SecurePassword123!",
+          role: "STUDENT",
+          affiliation: "University College",
+          research_interests: ["Databases"],
+        }),
+      });
+
+      assert.equal(res.status, 409);
+      const data = await res.json();
+      assert.match(data.error, /Email already in use/);
+    });
+
+    it("should reject registration attempts with privileged roles like SYSTEM_ADMIN (400)", async () => {
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: "Hacker Admin",
+          email: "hacker@university.edu",
+          password: "SecurePassword123!",
+          role: "SYSTEM_ADMIN",
+          affiliation: "Evil Corp",
+        }),
+      });
+
+      assert.equal(res.status, 400);
+      const data = await res.json();
+      assert.match(data.error, /Only STUDENT or RESEARCHER/);
+    });
+
+    it("should reject registration attempts with obsolete role LAB_ANNOTATOR (400)", async () => {
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: "Lab Person",
+          email: "labperson@university.edu",
+          password: "SecurePassword123!",
+          role: "LAB_ANNOTATOR",
+          affiliation: "Biology Lab",
+        }),
+      });
+
+      assert.equal(res.status, 400);
+      const data = await res.json();
+      assert.match(data.error, /Only STUDENT or RESEARCHER/);
+    });
+
+    it("should reject registration attempts with obsolete role READ_ONLY_VIEWER (400)", async () => {
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: "Viewer Person",
+          email: "viewer@university.edu",
+          password: "SecurePassword123!",
+          role: "READ_ONLY_VIEWER",
+          affiliation: "University",
+        }),
+      });
+
+      assert.equal(res.status, 400);
+      const data = await res.json();
+      assert.match(data.error, /Only STUDENT or RESEARCHER/);
+    });
+
     it("should handle email delivery failure safely without crashing registration", async () => {
+      // Mock repository methods so registration proceeds to email delivery
+      _setFindUserByEmailForTesting(async () => null);
+      _setCreateUserForTesting(async (u) => ({
+        id: "mock-user-uuid",
+        email: u.email,
+        full_name: u.fullName,
+        role: u.role,
+        affiliation: u.affiliation,
+        research_interests: u.researchInterests,
+        email_verified: false,
+      }));
+      _setCreateEmailVerificationTokenForTesting(async (t) => ({
+        id: "mock-token-uuid",
+        user_id: t.userId,
+        expires_at: t.expiresAt,
+      }));
+
       // Mock transporter that throws delivery error
       setTransporterForTesting({
         sendMail: async () => {
@@ -283,6 +449,11 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
     });
 
     it("POST /api/auth/verify-email should reject non-existent 64-char token (400)", async () => {
+      _setConsumeEmailVerificationTokenForTesting(async () => ({
+        success: false,
+        reason: "not_found",
+      }));
+
       const random64Token = crypto.randomBytes(32).toString("hex");
       const res = await fetch(`${baseUrl}/api/auth/verify-email`, {
         method: "POST",
@@ -296,6 +467,8 @@ describe("FR-01: User Registration & Email Verification Suite", () => {
     });
 
     it("POST /api/auth/resend-verification should return generic message for non-existent email (no enumeration)", async () => {
+      _setFindUserByEmailForTesting(async () => null);
+
       const res = await fetch(`${baseUrl}/api/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

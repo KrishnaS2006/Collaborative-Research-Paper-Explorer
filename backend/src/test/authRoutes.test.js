@@ -1,10 +1,15 @@
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import authRoutes from '../routes/auth.routes.js';
 import errorHandler from '../middleware/errorHandler.js';
 import { loginRateLimiter } from '../middleware/rateLimiter.js';
+import bcrypt from 'bcryptjs';
+import {
+  _setFindUserByEmailForTesting,
+  _resetFindUserByEmailForTesting,
+} from '../repositories/auth.repository.js';
 
 describe('Auth Router Integration (HTTP Endpoints)', () => {
   let app;
@@ -36,6 +41,11 @@ describe('Auth Router Integration (HTTP Endpoints)', () => {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+
+  afterEach(() => {
+    _resetFindUserByEmailForTesting();
+    loginRateLimiter.reset();
   });
 
   describe('POST /api/auth/register (Validation)', () => {
@@ -171,6 +181,109 @@ describe('Auth Router Integration (HTTP Endpoints)', () => {
 
       // Clean up for subsequent tests
       loginRateLimiter.reset();
+    });
+
+    it('should successfully log in with valid credentials, returning user and setting session cookie', async () => {
+      const passwordHash = await bcrypt.hash('CorrectPassword1!', 10);
+      _setFindUserByEmailForTesting(async (email) => ({
+        id: 'user-login-test-id',
+        email: email.toLowerCase(),
+        password_hash: passwordHash,
+        full_name: 'Verified User',
+        role: 'RESEARCHER',
+        affiliation: 'Science Dept',
+        research_interests: ['Genetics'],
+        email_verified: true,
+      }));
+
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'verified@university.edu',
+          password: 'CorrectPassword1!',
+        }),
+      });
+
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.message, 'Logged in successfully.');
+      assert.ok(data.user);
+      assert.equal(data.user.email, 'verified@university.edu');
+      assert.equal(data.user.role, 'RESEARCHER');
+
+      // Verify Set-Cookie header contains token
+      const cookieHeader = res.headers.get('set-cookie');
+      assert.ok(cookieHeader);
+      assert.match(cookieHeader, /token=/);
+      assert.match(cookieHeader, /HttpOnly/i);
+    });
+
+    it('should return 401 with generic error for nonexistent account (enumeration prevention)', async () => {
+      _setFindUserByEmailForTesting(async () => null);
+
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'nonexistent@university.edu',
+          password: 'Password123!',
+        }),
+      });
+
+      assert.equal(res.status, 401);
+      const data = await res.json();
+      assert.equal(data.error, 'Invalid email or password.');
+    });
+
+    it('should return 401 with generic error for incorrect password', async () => {
+      const passwordHash = await bcrypt.hash('RealPassword123!', 10);
+      _setFindUserByEmailForTesting(async (email) => ({
+        id: 'user-id-wrong-pwd',
+        email: email.toLowerCase(),
+        password_hash: passwordHash,
+        full_name: 'Real User',
+        role: 'STUDENT',
+        email_verified: true,
+      }));
+
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'real@university.edu',
+          password: 'WrongPassword123!',
+        }),
+      });
+
+      assert.equal(res.status, 401);
+      const data = await res.json();
+      assert.equal(data.error, 'Invalid email or password.');
+    });
+
+    it('should return 403 when unverified user attempts to log in', async () => {
+      const passwordHash = await bcrypt.hash('CorrectPassword1!', 10);
+      _setFindUserByEmailForTesting(async (email) => ({
+        id: 'unverified-user-id',
+        email: email.toLowerCase(),
+        password_hash: passwordHash,
+        full_name: 'Unverified User',
+        role: 'STUDENT',
+        email_verified: false,
+      }));
+
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'unverified@university.edu',
+          password: 'CorrectPassword1!',
+        }),
+      });
+
+      assert.equal(res.status, 403);
+      const data = await res.json();
+      assert.match(data.error, /verify your email address/);
     });
   });
 

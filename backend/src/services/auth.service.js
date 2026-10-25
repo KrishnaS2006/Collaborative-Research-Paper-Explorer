@@ -13,9 +13,15 @@ import {
   invalidateUnusedEmailVerificationTokens,
   consumeEmailVerificationToken,
   checkEmailVerifiedColumn,
+  updateUserProfile,
 } from "../repositories/auth.repository.js";
 
 import { getValidatedJwtSecret } from "../utils/jwt.js";
+import {
+  createSession,
+  invalidateAllUserSessions,
+  recordUserPasswordReset,
+} from "./session.service.js";
 import {
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
@@ -25,6 +31,7 @@ import {
   validateLoginPayload,
   validateVerifyEmailPayload,
   validateResendVerificationPayload,
+  validateForgotPasswordPayload,
   validateResetPasswordPayload,
   isAllowedInstitutionalEmail,
 } from "../utils/validation.js";
@@ -130,14 +137,14 @@ export const registerUser = async (payload = {}) => {
   }
 
   const responseUser = {
-    id: newUser.id,
-    email: newUser.email,
-    full_name: newUser.full_name,
-    role: newUser.role,
-    affiliation: newUser.affiliation,
-    research_interests: newUser.research_interests,
-    email_verified: newUser.email_verified,
-  };
+  id: newUser.id,
+  email: newUser.email,
+  full_name: newUser.full_name,
+  role: newUser.role,
+  affiliation: newUser.affiliation,
+  research_interests: newUser.research_interests,
+  email_verified: newUser.email_verified,
+};
 
   if (process.env.NODE_ENV !== "production") {
     responseUser.devVerificationToken = rawVerificationToken;
@@ -274,15 +281,21 @@ export const loginUser = async (payload = {}) => {
 
   const token = jwt.sign(
     {
-      _id: user.id,
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      affiliation: user.affiliation,
+       _id: user.id,
+  id: user.id,
+  email: user.email,
+  role: user.role,
+  affiliation: user.affiliation,
     },
     getValidatedJwtSecret(),
     { expiresIn: "8h" }
   );
+
+  // FR-04: Register server-side session for idle tracking and revocation
+  await createSession({
+    userId: user.id,
+    token,
+  });
 
   return {
     token,
@@ -365,7 +378,7 @@ export const requestPasswordReset = async ({ email } = {}) => {
   }
 
   const result = { message: GENERIC_PASSWORD_RESET_MESSAGE };
-  if (process.env.NODE_ENV !== "production" || process.env.EXPOSE_DEV_RESET_TOKEN === "true") {
+  if (process.env.EXPOSE_DEV_RESET_TOKEN === "true") {
     result.devResetToken = rawToken;
   }
   return result;
@@ -411,9 +424,108 @@ export const resetUserPassword = async (payload = {}) => {
     );
   }
 
+  // Guaranteed immediate in-memory cutoff: makes all pre-existing sessions unusable
+  if (result.userId) {
+    recordUserPasswordReset(result.userId);
+  }
+
+  // Revoke all active sessions for this user across memory and database
+  if (result.userId) {
+    try {
+      await invalidateAllUserSessions(result.userId);
+    } catch (sessionError) {
+      console.error(
+        "Failed to revoke active user sessions after password reset:",
+        sessionError.message
+      );
+      throw createError(
+        "Password has been reset, but revoking existing sessions encountered an error.",
+        500
+      );
+    }
+  }
+
   return {
     message:
       "Password has been reset successfully. You can now sign in with your new password.",
+  };
+};
+
+export const updateUserProfileService = async ({
+  userId,
+  currentUserRole,
+  payload = {},
+}) => {
+  if (!userId) {
+    throw createError("User identifier is required.", 400);
+  }
+
+  // FR-05: Prevent users from changing their own roles through profile updates
+  if (payload.role !== undefined || payload.access_role !== undefined) {
+    throw createError(
+      "Changing user roles through profile update is forbidden. Role assignments require administrator privileges.",
+      403
+    );
+  }
+
+  const { full_name, affiliation, research_interests } = payload;
+  const updateData = { userId };
+
+  if (full_name !== undefined) {
+    if (typeof full_name !== "string" || !full_name.trim()) {
+      throw createError("Full name cannot be empty.", 400);
+    }
+    if (full_name.trim().length > 150) {
+      throw createError("Full name cannot exceed 150 characters.", 400);
+    }
+    updateData.fullName = full_name.trim();
+  }
+
+  if (affiliation !== undefined) {
+    if (typeof affiliation !== "string") {
+      throw createError("Affiliation must be a string.", 400);
+    }
+    if (affiliation.trim().length > 255) {
+      throw createError("Affiliation cannot exceed 255 characters.", 400);
+    }
+    updateData.affiliation = affiliation.trim() || null;
+  }
+
+  if (research_interests !== undefined) {
+    if (!Array.isArray(research_interests)) {
+      throw createError("Research interests must be a list.", 400);
+    }
+    if (
+      research_interests.some(
+        (interest) => typeof interest !== "string" || !interest.trim()
+      )
+    ) {
+      throw createError("Each research interest must be a non-empty string.", 400);
+    }
+    const deduplicated = [
+      ...new Set(
+        research_interests.map((i) => i.trim()).filter(Boolean)
+      ),
+    ];
+    if (deduplicated.length > 20) {
+      throw createError("You can select up to 20 research interests.", 400);
+    }
+    updateData.researchInterests = deduplicated;
+  }
+
+  const updatedUser = await updateUserProfile(updateData);
+  if (!updatedUser) {
+    throw createError("User account not found.", 404);
+  }
+
+  return {
+    id: updatedUser.id,
+    email: updatedUser.email,
+    full_name: updatedUser.full_name,
+    role: updatedUser.role,
+    affiliation: updatedUser.affiliation,
+    research_interests: updatedUser.research_interests,
+    email_verified: updatedUser.email_verified,
   };
 };
 
@@ -425,4 +537,5 @@ export default {
   getCurrentUserById,
   requestPasswordReset,
   resetUserPassword,
+  updateUserProfileService,
 };

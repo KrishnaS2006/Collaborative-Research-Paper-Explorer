@@ -6,7 +6,6 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [devResetToken, setDevResetToken] = useState('');
   const [loading, setLoading] = useState(false);
 
   const { forgotPassword } = useAuth();
@@ -15,7 +14,6 @@ export default function ForgotPassword() {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
-    setDevResetToken('');
 
     const trimmedEmail = email.trim();
 
@@ -37,9 +35,6 @@ export default function ForgotPassword() {
         data.message ||
           'If an account with that email exists, a password reset link has been sent.'
       );
-      if (data.devResetToken) {
-        setDevResetToken(data.devResetToken);
-      }
     } catch (err) {
       setError(
         err.response?.data?.error ||
@@ -84,24 +79,6 @@ export default function ForgotPassword() {
                 The link is valid for 15 minutes and can only be used once.
               </p>
             </div>
-
-            {devResetToken && (
-              <div className="bg-amber-50 border border-amber-300 p-3 rounded-lg text-xs text-amber-900">
-                <span className="font-bold block mb-1">
-                  🛠️ Local Development Preview:
-                </span>
-                <p className="mb-2">
-                  A reset token was generated. Click below to proceed with
-                  testing:
-                </p>
-                <Link
-                  to={`/reset-password?token=${encodeURIComponent(devResetToken)}`}
-                  className="inline-block px-3 py-1.5 bg-amber-600 text-white font-semibold rounded hover:bg-amber-700 transition duration-200"
-                >
-                  Open Reset Password Page →
-                </Link>
-              </div>
-            )}
 
             <div className="text-center pt-2">
               <Link

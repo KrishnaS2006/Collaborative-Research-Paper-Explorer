@@ -25,8 +25,11 @@
 CREATE TYPE user_role AS ENUM (
     'STUDENT',
     'RESEARCHER',
-    'SYSTEM_ADMIN'
+    'SYSTEM_ADMIN',
+    'SYSTEM ADMIN'
 );
+
+
 
 -- Collaboration roles within a collection.
 CREATE TYPE collection_role AS ENUM (
@@ -98,6 +101,8 @@ CREATE TABLE users (
     )
 );
 
+
+
 CREATE INDEX idx_users_research_interests ON users USING GIN (research_interests);
 -- Case-insensitive unique email. [DB]
 CREATE UNIQUE INDEX idx_users_email_ci ON users (LOWER(email));
@@ -116,7 +121,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 CREATE OR REPLACE FUNCTION fn_block_public_admin_insert()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.role = 'SYSTEM_ADMIN' THEN
+    IF NEW.role::text = 'SYSTEM_ADMIN' OR NEW.role::text = 'SYSTEM ADMIN' THEN
         RAISE EXCEPTION
             'Direct INSERT with role SYSTEM_ADMIN is not permitted. '
             'Use the privileged admin-provisioning procedure.';
@@ -432,6 +437,32 @@ CREATE TABLE sso_identities (
 
 CREATE INDEX idx_sso_identities_user_id ON sso_identities (user_id);
 CREATE INDEX idx_sso_identities_provider_email ON sso_identities (provider, LOWER(email));
+
+-- ------------------------------------------------------------------------------
+-- TABLE: user_sessions
+--
+-- FR-04: Manages active user sessions, server-side token revocation, and idle tracking.
+-- Tokens are looked up by secure SHA-256 hash.
+-- Sessions expire automatically after 30 minutes of inactivity (last_active_at)
+-- or upon reaching the absolute max expiration timestamp (expires_at).
+-- Revocation is tracked via revoked_at for explicit logout invalidation.
+-- ------------------------------------------------------------------------------
+CREATE TABLE user_sessions (
+    id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID         NOT NULL
+                                REFERENCES users(id) ON DELETE CASCADE,
+    token_hash     VARCHAR(64)  NOT NULL UNIQUE,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_active_at TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at     TIMESTAMPTZ  NOT NULL,
+    revoked_at     TIMESTAMPTZ,
+    user_agent     TEXT,
+    ip_address     VARCHAR(45)
+);
+
+CREATE INDEX idx_user_sessions_user_id ON user_sessions (user_id);
+CREATE INDEX idx_user_sessions_token_hash ON user_sessions (token_hash);
+CREATE INDEX idx_user_sessions_last_active_at ON user_sessions (last_active_at);
 
 
 -- ==============================================================================
